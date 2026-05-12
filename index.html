@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>神戸マラソン2026 トラッカー</title>
+<!-- PWA / iOS ホーム画面アプリ化 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="神戸Marathon">
+<meta name="theme-color" content="#023E8A">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon.png">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Helvetica Neue', sans-serif;
+  background: #f0f2f5; color: #333;
+  /* ホーム画面アプリ時のセーフエリア対応 */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.header {
+  background: linear-gradient(135deg, #023E8A 0%, #0077B6 100%);
+  color: white;
+  padding: calc(24px + env(safe-area-inset-top)) 20px 28px;
+  text-align: center;
+}
+.header h1 { font-size: 1.1em; opacity: 0.9; margin-bottom: 8px; letter-spacing: 0.5px; }
+.countdown-num { font-size: 3.2em; font-weight: 800; color: #FFD60A; line-height: 1; }
+.countdown-label { font-size: 0.85em; opacity: 0.7; margin-top: 4px; }
+.phase-badge {
+  display: inline-block; margin-top: 14px;
+  background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 20px; padding: 5px 14px; font-size: 0.85em;
+}
+
+.container { max-width: 600px; margin: 0 auto; padding: 16px; }
+
+.card {
+  background: white; border-radius: 14px; padding: 18px;
+  margin-bottom: 14px; box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+}
+.card-title {
+  font-size: 0.75em; color: #999; text-transform: uppercase;
+  letter-spacing: 1px; margin-bottom: 14px; font-weight: 600;
+}
+
+/* Phase card */
+.phase-header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.phase-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.phase-name { font-size: 1.2em; font-weight: 700; }
+.phase-sub { font-size: 0.85em; color: #666; }
+.phase-goal {
+  font-size: 0.88em; background: #f8f9fa; padding: 9px 12px;
+  border-radius: 8px; color: #444; margin-bottom: 12px;
+}
+.progress-bar { height: 6px; background: #eee; border-radius: 3px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+.progress-meta { display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.75em; color: #aaa; }
+
+/* Stats */
+.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; }
+.stat-item { text-align: center; padding: 4px 0; }
+.stat-item + .stat-item { border-left: 1px solid #f0f0f0; }
+.stat-val { font-size: 1.8em; font-weight: 800; color: #023E8A; }
+.stat-lbl { font-size: 0.72em; color: #999; margin-top: 2px; }
+
+/* CTA */
+.btn-log {
+  width: 100%; padding: 16px; background: #E85D04; color: white;
+  border: none; border-radius: 12px; font-size: 1.05em; font-weight: 700;
+  cursor: pointer; letter-spacing: 0.3px;
+  box-shadow: 0 4px 12px rgba(232,93,4,0.3);
+}
+.btn-log:active { transform: scale(0.98); }
+.btn-watch {
+  width: 100%; padding: 13px; margin-top: 10px;
+  background: white; color: #1C1C1E;
+  border: 1.5px solid #ddd; border-radius: 12px;
+  font-size: 0.95em; font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn-watch:active { background: #f5f5f5; }
+
+/* Run list */
+.run-item { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid #f5f5f5; }
+.run-item:last-child { border-bottom: none; }
+.run-icon { width: 36px; height: 36px; border-radius: 50%; background: #EBF5FB; display: flex; align-items: center; justify-content: center; font-size: 1em; flex-shrink: 0; }
+.run-main { flex: 1; min-width: 0; }
+.run-dist { font-weight: 700; font-size: 1em; }
+.run-meta { font-size: 0.78em; color: #888; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.run-badge { font-size: 0.72em; padding: 3px 8px; border-radius: 10px; background: #EBF5FB; color: #1565C0; white-space: nowrap; flex-shrink: 0; }
+.run-badge.long { background: #FDF3E3; color: #E65100; }
+.run-badge.other { background: #F0FFF4; color: #2E7D32; }
+.btn-del { color: #ddd; background: none; border: none; font-size: 1.1em; cursor: pointer; padding: 4px; flex-shrink: 0; }
+.btn-del:hover { color: #e53935; }
+
+/* Milestones */
+.ms-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f5f5f5; cursor: pointer; user-select: none; }
+.ms-item:last-child { border-bottom: none; }
+.ms-circle {
+  width: 26px; height: 26px; border-radius: 50%; border: 2px solid #ddd;
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 0.8em; transition: all 0.2s;
+}
+.ms-item.done .ms-circle { background: #4CAF50; border-color: #4CAF50; color: white; }
+.ms-text { flex: 1; font-size: 0.9em; }
+.ms-item.done .ms-text { text-decoration: line-through; color: #bbb; }
+.ms-date { font-size: 0.72em; color: #bbb; white-space: nowrap; }
+
+.empty { text-align: center; padding: 24px 0; color: #bbb; font-size: 0.88em; line-height: 1.6; }
+
+/* Modal */
+.overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5); z-index: 200; align-items: flex-end;
+}
+.overlay.open { display: flex; }
+.modal {
+  background: white; border-radius: 20px 20px 0 0; padding: 24px 20px 32px;
+  width: 100%; max-height: 92vh; overflow-y: auto;
+}
+.modal-title { font-size: 1.15em; font-weight: 700; margin-bottom: 20px; }
+
+.fg { margin-bottom: 14px; }
+.fg label { display: block; font-size: 0.82em; color: #666; margin-bottom: 5px; font-weight: 500; }
+.fg input, .fg select, .fg textarea {
+  width: 100%; padding: 11px 12px; border: 1.5px solid #e0e0e0;
+  border-radius: 9px; font-size: 0.95em; font-family: inherit; background: white;
+  -webkit-appearance: none;
+}
+.fg input:focus, .fg select:focus { outline: none; border-color: #0077B6; }
+.fg textarea { resize: none; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.pace-hint { font-size: 0.8em; color: #0077B6; font-weight: 600; margin-top: 5px; min-height: 18px; }
+
+/* RPE selector */
+.rpe-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 6px; margin-top: 6px; }
+.rpe-btn {
+  padding: 8px 4px; border: 1.5px solid #e0e0e0; border-radius: 8px;
+  background: white; font-size: 0.9em; font-weight: 700; cursor: pointer;
+  text-align: center; transition: all 0.15s;
+}
+.rpe-btn.sel { color: white; border-color: transparent; }
+.rpe-btn[data-v="1"],.rpe-btn[data-v="2"] { --c:#4CAF50; }
+.rpe-btn[data-v="3"],.rpe-btn[data-v="4"] { --c:#8BC34A; }
+.rpe-btn[data-v="5"],.rpe-btn[data-v="6"] { --c:#FFC107; }
+.rpe-btn[data-v="7"],.rpe-btn[data-v="8"] { --c:#FF5722; }
+.rpe-btn[data-v="9"],.rpe-btn[data-v="10"]{ --c:#E53935; }
+.rpe-btn.sel { background: var(--c); }
+.rpe-label { font-size: 0.72em; color: #999; text-align: center; margin-top: 5px; min-height: 16px; }
+
+/* run detail badges */
+.run-extras { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 3px; }
+.run-extra-tag { font-size: 0.72em; padding: 2px 7px; border-radius: 8px; background: #f5f5f5; color: #555; }
+
+.modal-actions { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; margin-top: 20px; }
+.btn-cancel { padding: 13px; background: #f0f2f5; border: none; border-radius: 9px; font-size: 0.95em; cursor: pointer; }
+.btn-save { padding: 13px; background: #023E8A; color: white; border: none; border-radius: 9px; font-size: 0.95em; font-weight: 700; cursor: pointer; }
+
+/* Weekly Progress */
+.week-row { margin-bottom:14px; }
+.week-row:last-child { margin-bottom:0; }
+.week-header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px; }
+.week-label { font-size:0.78em; color:#999; }
+.week-km { font-size:0.88em; font-weight:700; color:#023E8A; }
+.week-bar-bg { height:10px; background:#f0f0f0; border-radius:5px; overflow:hidden; }
+.week-bar-fill { height:100%; border-radius:5px; transition:width 0.4s ease; }
+.week-dots { display:flex; gap:4px; margin-top:5px; flex-wrap:wrap; }
+.run-dot {
+  display:flex; align-items:center; gap:3px;
+  font-size:0.72em; padding:2px 7px; border-radius:10px; color:white; font-weight:600;
+}
+.week-empty { font-size:0.82em; color:#ccc; padding:2px 0; }
+
+/* Setup guide */
+.setup-steps { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.setup-step { display: flex; align-items: flex-start; gap: 12px; font-size: 0.88em; }
+.step-num { width: 24px; height: 24px; border-radius: 50%; background: #023E8A; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.8em; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+.setup-step small { font-size: 0.85em; color: #999; }
+.btn-setup-done { width: 100%; padding: 10px; background: #f0f2f5; border: none; border-radius: 8px; font-size: 0.85em; color: #999; cursor: pointer; margin-top: 4px; }
+
+/* Backup */
+.backup-note { font-size: 0.82em; color: #888; margin-bottom: 12px; line-height: 1.5; }
+.backup-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.btn-backup { padding: 11px; background: #f0f2f5; border: none; border-radius: 9px; font-size: 0.88em; font-weight: 600; cursor: pointer; }
+
+/* Pace Analysis */
+.pa-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
+.pa-time-block {}
+.pa-time { font-size: 2.4em; font-weight: 800; color: #023E8A; line-height: 1; letter-spacing: -1px; }
+.pa-time-sub { font-size: 0.72em; color: #aaa; margin-top: 3px; }
+.pa-tier { display: inline-flex; align-items: center; gap: 5px; padding: 6px 13px; border-radius: 20px; font-size: 0.82em; font-weight: 700; color: white; white-space: nowrap; }
+.pa-rows { border-top: 1px solid #f5f5f5; padding-top: 10px; }
+.pa-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; font-size: 0.86em; }
+.pa-row + .pa-row { border-top: 1px solid #f8f8f8; }
+.pa-lbl { color: #999; }
+.pa-val { font-weight: 600; color: #333; }
+.pa-trend { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 0.78em; font-weight: 600; }
+.pa-note { font-size: 0.72em; color: #ccc; text-align: center; margin-top: 10px; }
+.pa-empty { text-align: center; padding: 18px 0 6px; }
+.pa-empty-num { font-size: 2em; font-weight: 800; color: #e0e0e0; }
+.pa-empty-msg { font-size: 0.82em; color: #bbb; margin-top: 4px; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🏃 神戸マラソン 2026</h1>
+  <div class="countdown-num" id="countdownNum">---</div>
+  <div class="countdown-label">日後スタート（11月22日）</div>
+  <div class="phase-badge" id="headerPhase">---</div>
+</div>
+
+<div class="container">
+
+  <!-- Phase Progress -->
+  <div class="card">
+    <div class="card-title">現在のフェーズ</div>
+    <div class="phase-header">
+      <div class="phase-dot" id="phaseDot"></div>
+      <div>
+        <div class="phase-name" id="phaseName">---</div>
+        <div class="phase-sub" id="phaseSub">---</div>
+      </div>
+    </div>
+    <div class="phase-goal" id="phaseGoal">---</div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    <div class="progress-meta">
+      <span id="progressStart">---</span>
+      <span id="progressPct">0%</span>
+      <span id="progressEnd">---</span>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="card">
+    <div class="card-title">累計記録</div>
+    <div class="stats-grid">
+      <div class="stat-item">
+        <div class="stat-val" id="statRuns">0</div>
+        <div class="stat-lbl">回</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-val" id="statKm">0.0</div>
+        <div class="stat-lbl">km 合計</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-val" id="statBest">0.0</div>
+        <div class="stat-lbl">km 最長</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Weekly Progress -->
+  <div class="card">
+    <div class="card-title">週間進捗</div>
+    <div id="weeklyProgress"></div>
+  </div>
+
+  <!-- Pace Analysis -->
+  <div class="card">
+    <div class="card-title">目標ペース分析（自動）</div>
+    <div id="paceAnalysis"></div>
+  </div>
+
+  <!-- Log button -->
+  <button class="btn-log" onclick="openModal()">＋　ランを記録する</button>
+  <button class="btn-watch" onclick="importFromWatch()">⌚  Apple Watch から取り込む</button>
+
+  <!-- Milestones -->
+  <div class="card" style="margin-top:14px">
+    <div class="card-title">マイルストーン</div>
+    <div id="msList"></div>
+  </div>
+
+  <!-- History -->
+  <div class="card">
+    <div class="card-title">ラン履歴</div>
+    <div id="runList"></div>
+  </div>
+
+
+  <!-- Data backup -->
+  <div class="card">
+    <div class="card-title">データのバックアップ</div>
+    <div class="backup-note">アプリ更新後もデータは自動で引き継がれます。<br>念のためバックアップも可能です。</div>
+    <div class="backup-btns">
+      <button class="btn-backup" onclick="exportData()">📤 エクスポート</button>
+      <button class="btn-backup" onclick="showImport()">📥 インポート</button>
+    </div>
+    <div id="importArea" style="display:none; margin-top:12px;">
+      <textarea id="importJson" rows="3" placeholder="エクスポートしたJSONをペーストしてください" style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-size:0.85em;font-family:monospace;resize:none;"></textarea>
+      <button class="btn-save" style="width:100%;margin-top:8px;padding:11px;background:#023E8A;color:white;border:none;border-radius:9px;font-size:0.95em;font-weight:700;cursor:pointer;" onclick="importData()">インポートして復元</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal -->
+<div class="overlay" id="overlay" onclick="overlayClick(event)">
+  <div class="modal" id="modal">
+    <div class="modal-title">ランを記録</div>
+
+    <div class="fg">
+      <label>日付</label>
+      <input type="date" id="fDate">
+    </div>
+    <div class="fg">
+      <label>種別</label>
+      <select id="fType" onchange="onTypeChange()">
+        <option value="commute">通勤ラン（尼崎→青木）</option>
+        <option value="outdoor">屋外ラン</option>
+        <option value="indoor">屋内ラン（ジム）</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>距離（km）</label>
+      <input type="number" id="fDist" placeholder="例: 2.6" step="0.1" min="0" oninput="onDistChange()">
+      <div id="stationHint" style="font-size:0.75em;color:#aaa;margin-top:5px;">参考：1駅=1.3km　3駅=3.9km　5駅=6.5km　全区間=約17km</div>
+    </div>
+    <div class="row2">
+      <div class="fg">
+        <label>タイム（分）</label>
+        <input type="number" id="fMin" placeholder="例: 65" min="1" oninput="onDistChange()">
+      </div>
+      <div class="fg">
+        <label>&nbsp;</label>
+        <div class="pace-hint" id="paceHint"></div>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="fg">
+        <label>平均ペース（任意）</label>
+        <input type="text" id="fPace" placeholder="例: 5:45" pattern="\d+:\d{2}">
+      </div>
+      <div class="fg">
+        <label>平均心拍数（任意）</label>
+        <input type="number" id="fHR" placeholder="例: 156" min="40" max="220">
+      </div>
+    </div>
+    <div class="fg">
+      <label>難易度（任意）</label>
+      <div class="rpe-grid" id="rpeGrid">
+        <button type="button" class="rpe-btn" data-v="1" onclick="selectRPE(1)">1</button>
+        <button type="button" class="rpe-btn" data-v="2" onclick="selectRPE(2)">2</button>
+        <button type="button" class="rpe-btn" data-v="3" onclick="selectRPE(3)">3</button>
+        <button type="button" class="rpe-btn" data-v="4" onclick="selectRPE(4)">4</button>
+        <button type="button" class="rpe-btn" data-v="5" onclick="selectRPE(5)">5</button>
+        <button type="button" class="rpe-btn" data-v="6" onclick="selectRPE(6)">6</button>
+        <button type="button" class="rpe-btn" data-v="7" onclick="selectRPE(7)">7</button>
+        <button type="button" class="rpe-btn" data-v="8" onclick="selectRPE(8)">8</button>
+        <button type="button" class="rpe-btn" data-v="9" onclick="selectRPE(9)">9</button>
+        <button type="button" class="rpe-btn" data-v="10" onclick="selectRPE(10)">10</button>
+      </div>
+      <div class="rpe-label" id="rpeLabel">タップして選択</div>
+      <input type="hidden" id="fRPE" value="">
+    </div>
+    <div class="fg">
+      <label>メモ（任意）</label>
+      <textarea id="fNote" rows="2" placeholder="体調、感想など..."></textarea>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">キャンセル</button>
+      <button class="btn-save" onclick="saveRun()">保存する</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STATION_KM = 1.3;
+const RACE_DATE_STR = '2026-11-22';
+const RACE_DATE = new Date(RACE_DATE_STR + 'T00:00:00');
+
+const PHASES = [
+  { name:'Phase 1', sub:'走れる体を作る',       start:'2026-05-11', end:'2026-06-15', goal:'目標：3.9kmを止まらず走れる',           color:'#4CAF50' },
+  { name:'Phase 2', sub:'10km完走',             start:'2026-06-16', end:'2026-08-03', goal:'目標：10km走れる',                     color:'#2196F3' },
+  { name:'Phase 3', sub:'ハーフ〜25km領域',      start:'2026-08-04', end:'2026-09-21', goal:'目標：ハーフ（21km）完走',             color:'#9C27B0' },
+  { name:'Phase 4', sub:'フルマラソン仕上げ',    start:'2026-09-22', end:'2026-10-19', goal:'目標：30km走完了',                     color:'#FF5722' },
+  { name:'バッファー', sub:'調整期',             start:'2026-10-20', end:'2026-11-08', goal:'体調管理・最終調整・目標ペース確認',     color:'#FF9800' },
+  { name:'テーパー', sub:'本番準備',             start:'2026-11-09', end:'2026-11-22', goal:'軽いジョグのみ・装備・睡眠・食事管理',  color:'#607D8B' },
+];
+
+const MILESTONES = [
+  { id:'m1', text:'30分間走り続けられた',     date:'6月上旬目安'  },
+  { id:'m2', text:'5km完走',                 date:'7月上旬目安'  },
+  { id:'m3', text:'10km完走',                date:'8月中旬目安'  },
+  { id:'m4', text:'ハーフ（21km）完走 🎉',   date:'9月中旬目安'  },
+  { id:'m5', text:'30km走完了',              date:'10月中旬目安' },
+  { id:'m6', text:'神戸マラソン完走！！ 🏅', date:'11/22'        },
+];
+
+// Storage
+const getRuns = () => JSON.parse(localStorage.getItem('runs_kobe26') || '[]');
+const setRuns = v => localStorage.setItem('runs_kobe26', JSON.stringify(v));
+const getMS   = () => JSON.parse(localStorage.getItem('ms_kobe26')   || '{}');
+const setMS   = v => localStorage.setItem('ms_kobe26',   JSON.stringify(v));
+
+// Helpers
+function today() { return new Date(new Date().toLocaleDateString('sv')); }
+function toDate(s) { return new Date(s + 'T00:00:00'); }
+function fmtDate(s) { const d = toDate(s); return `${d.getMonth()+1}/${d.getDate()}`; }
+function fmtPace(km, min) {
+  const p = min / km;
+  const m = Math.floor(p), s = Math.round((p-m)*60);
+  return `${m}:${String(s).padStart(2,'0')}`;
+}
+function stationsToKm(v) { return v === 'full' ? 17 : parseInt(v) * STATION_KM; }
+
+// Phase
+function getPhase() {
+  const t = today();
+  for (const p of PHASES) {
+    if (t >= toDate(p.start) && t <= toDate(p.end)) return p;
+  }
+  return PHASES[PHASES.length - 1];
+}
+function phaseProgress(p) {
+  const t = today(), s = toDate(p.start), e = toDate(p.end);
+  return Math.min(100, Math.max(0, Math.round((t-s)/(e-s)*100)));
+}
+
+// Render
+function render() {
+  // Countdown
+  const diff = Math.ceil((RACE_DATE - today()) / 86400000);
+  document.getElementById('countdownNum').textContent = Math.max(0, diff);
+
+  // Phase
+  const p = getPhase();
+  document.getElementById('headerPhase').textContent = `${p.name}：${p.sub}`;
+  document.getElementById('phaseDot').style.background = p.color;
+  document.getElementById('phaseName').textContent = p.name;
+  document.getElementById('phaseSub').textContent = p.sub;
+  document.getElementById('phaseGoal').textContent = p.goal;
+  const pct = phaseProgress(p);
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressFill').style.background = p.color;
+  document.getElementById('progressStart').textContent = p.start.slice(5).replace('-','/');
+  document.getElementById('progressEnd').textContent   = p.end.slice(5).replace('-','/');
+  document.getElementById('progressPct').textContent   = pct + '%';
+
+  // Stats
+  const runs = getRuns();
+  const totalKm = runs.reduce((s,r) => s + r.km, 0);
+  const bestKm  = runs.length ? Math.max(...runs.map(r => r.km)) : 0;
+  document.getElementById('statRuns').textContent = runs.length;
+  document.getElementById('statKm').textContent   = totalKm.toFixed(1);
+  document.getElementById('statBest').textContent = bestKm.toFixed(1);
+
+  // Run list
+  const rl = document.getElementById('runList');
+  if (!runs.length) {
+    rl.innerHTML = '<div class="empty">まだ記録がありません 👟<br>最初のランを記録しましょう！</div>';
+  } else {
+    rl.innerHTML = [...runs].reverse().map((r, ri) => {
+      const idx = runs.length - 1 - ri;
+      const icon = r.type==='commute' ? '🏃' : r.type==='outdoor' ? '🌤️' : '🏋️';
+      const badgeClass = r.type==='outdoor' ? 'long' : r.type==='indoor' ? 'other' : '';
+      const badgeText = r.type==='commute' ? '通勤ラン' : r.type==='outdoor' ? '屋外ラン' : '屋内ラン';
+      const stationInfo = '';
+      const paceInfo = r.min ? fmtPace(r.km, r.min) + '/km' : '';
+      const note = r.note ? ` · ${r.note}` : '';
+      const displayPace = r.pace || (r.min ? fmtPace(r.km, r.min)+'/km' : '');
+      const extras = [
+        displayPace ? `⏱ ${displayPace}` : '',
+        r.hr   ? `❤️ ${r.hr}拍` : '',
+        r.rpe  ? `💪 強度${r.rpe}` : '',
+      ].filter(Boolean);
+      return `<div class="run-item">
+        <div class="run-icon">${icon}</div>
+        <div class="run-main">
+          <div class="run-dist">${r.km.toFixed(1)} km　<span style="font-size:0.8em;font-weight:400;color:#888">${fmtDate(r.date)} · ${r.min ? r.min+'分' : ''}${note}</span></div>
+          ${extras.length ? `<div class="run-extras">${extras.map(e=>`<span class="run-extra-tag">${e}</span>`).join('')}</div>` : ''}
+        </div>
+        <span class="run-badge ${badgeClass}">${badgeText}</span>
+        <button class="btn-del" onclick="delRun(${idx})">×</button>
+      </div>`;
+    }).join('');
+  }
+
+  // Milestones
+  const ms = getMS();
+  document.getElementById('msList').innerHTML = MILESTONES.map(m => `
+    <div class="ms-item ${ms[m.id]?'done':''}" onclick="toggleMS('${m.id}')">
+      <div class="ms-circle">${ms[m.id]?'✓':''}</div>
+      <div class="ms-text">${m.text}</div>
+      <div class="ms-date">${m.date}</div>
+    </div>
+  `).join('');
+}
+
+function delRun(i) {
+  if (!confirm('この記録を削除しますか？')) return;
+  const r = getRuns(); r.splice(i,1); setRuns(r); render(); renderWeekly(); renderPaceAnalysis();
+}
+function toggleMS(id) {
+  const ms = getMS(); ms[id] = !ms[id]; setMS(ms); render();
+}
+
+// Modal
+const RPE_LABELS = {1:'とても楽',2:'楽',3:'少し楽',4:'普通',5:'少しきつい',6:'ちょっときつい',7:'きつい',8:'かなりきつい',9:'とてもきつい',10:'限界'};
+
+function selectRPE(v) {
+  document.getElementById('fRPE').value = v;
+  document.querySelectorAll('.rpe-btn').forEach(b => b.classList.toggle('sel', parseInt(b.dataset.v) === v));
+  document.getElementById('rpeLabel').textContent = `${v} - ${RPE_LABELS[v]}`;
+}
+
+function openModal() {
+  document.getElementById('fDate').value = new Date().toLocaleDateString('sv');
+  document.getElementById('fType').value = 'commute';
+  document.getElementById('fDist').value = '';
+  document.getElementById('fMin').value = '';
+  document.getElementById('fPace').value = '';
+  document.getElementById('fHR').value = '';
+  document.getElementById('fRPE').value = '';
+  document.getElementById('fNote').value = '';
+  document.getElementById('paceHint').textContent = '';
+  document.getElementById('rpeLabel').textContent = 'タップして選択';
+  document.querySelectorAll('.rpe-btn').forEach(b => b.classList.remove('sel'));
+  onTypeChange();
+  document.getElementById('overlay').classList.add('open');
+}
+function closeModal() { document.getElementById('overlay').classList.remove('open'); }
+function overlayClick(e) { if (e.target === document.getElementById('overlay')) closeModal(); }
+
+function onTypeChange() {
+  const t = document.getElementById('fType').value;
+  const hint = document.getElementById('stationHint');
+  if (hint) hint.style.display = t === 'commute' ? 'block' : 'none';
+  document.getElementById('fDist').placeholder = t === 'indoor' ? '例: 3.0' : '例: 2.6';
+  // 屋内ランならメモに「トレッドミル」を自動入力
+  const noteEl = document.getElementById('fNote');
+  if (t === 'indoor' && !noteEl.value) noteEl.value = 'トレッドミル';
+  if (t !== 'indoor' && noteEl.value === 'トレッドミル') noteEl.value = '';
+  onDistChange();
+}
+function onDistChange() {
+  const km = parseFloat(document.getElementById('fDist').value);
+  const min = parseFloat(document.getElementById('fMin').value);
+  const hint = document.getElementById('paceHint');
+  if (km > 0 && min > 0) {
+    hint.textContent = 'ペース：' + fmtPace(km, min) + '/km';
+  } else if (km > 0) {
+    hint.textContent = km.toFixed(1) + ' km';
+  } else {
+    hint.textContent = '';
+  }
+}
+
+function saveRun() {
+  const date = document.getElementById('fDate').value;
+  const type = document.getElementById('fType').value;
+  const min  = parseFloat(document.getElementById('fMin').value) || null;
+  const note = document.getElementById('fNote').value.trim();
+  const km   = parseFloat(document.getElementById('fDist').value);
+
+  if (!km || km <= 0) { alert('距離（km）を入力してください'); return; }
+  if (!date) { alert('日付を選択してください'); return; }
+
+  const pace = document.getElementById('fPace').value.trim() || null;
+  const hr   = parseInt(document.getElementById('fHR').value) || null;
+  const rpe  = parseInt(document.getElementById('fRPE').value) || null;
+
+  const runs = getRuns();
+  runs.push({ date, type, km, min, pace, hr, rpe, note });
+  runs.sort((a,b) => a.date.localeCompare(b.date));
+  setRuns(runs);
+  closeModal();
+  render();
+  renderWeekly();
+  renderPaceAnalysis();
+}
+
+// ── Weekly Progress ──────────────────────────────────────────
+const TYPE_COLORS = { commute:'#0077B6', outdoor:'#4CAF50', indoor:'#FF9800' };
+const TYPE_LABELS = { commute:'通勤', outdoor:'屋外', indoor:'屋内' };
+
+function renderWeekly() {
+  const runs = getRuns();
+  const el = document.getElementById('weeklyProgress');
+  if (!runs.length) {
+    el.innerHTML = '<div class="empty">ランを記録すると週ごとの進捗が表示されます</div>';
+    return;
+  }
+
+  // 週ごとにグループ化（月曜始まり）
+  const weeks = {};
+  runs.forEach(r => {
+    const d = new Date(r.date + 'T00:00:00');
+    const day = d.getDay() || 7; // 1=Mon, 7=Sun
+    const mon = new Date(d); mon.setDate(d.getDate() - day + 1);
+    const key = mon.toLocaleDateString('sv');
+    if (!weeks[key]) weeks[key] = { runs: [], totalKm: 0, mon };
+    weeks[key].runs.push(r);
+    weeks[key].totalKm += r.km;
+  });
+
+  const sortedKeys = Object.keys(weeks).sort().reverse().slice(0, 8);
+  const maxKm = Math.max(...sortedKeys.map(k => weeks[k].totalKm), 1);
+
+  el.innerHTML = sortedKeys.map(key => {
+    const w = weeks[key];
+    const sun = new Date(w.mon); sun.setDate(w.mon.getDate() + 6);
+    const label = `${w.mon.getMonth()+1}/${w.mon.getDate()} 〜 ${sun.getMonth()+1}/${sun.getDate()}`;
+    const pct = Math.round(w.totalKm / maxKm * 100);
+    const km = w.totalKm.toFixed(1);
+
+    // バーの色：最大週は濃く
+    const isMax = w.totalKm === maxKm;
+    const barColor = isMax ? '#023E8A' : '#90CAF9';
+
+    // ランのドット
+    const dots = w.runs.map(r => {
+      const c = TYPE_COLORS[r.type] || '#023E8A';
+      const lbl = TYPE_LABELS[r.type] || '';
+      const pace = r.pace || (r.min ? fmtPace(r.km, r.min)+'/km' : '');
+      return `<span class="run-dot" style="background:${c}">${r.km.toFixed(1)}km${pace ? ' · '+pace : ''}</span>`;
+    }).join('');
+
+    return `<div class="week-row">
+      <div class="week-header">
+        <span class="week-label">${label}</span>
+        <span class="week-km">${km} km　${w.runs.length}回</span>
+      </div>
+      <div class="week-bar-bg">
+        <div class="week-bar-fill" style="width:${pct}%;background:${barColor}"></div>
+      </div>
+      <div class="week-dots">${dots}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Pace Analysis ───────────────────────────────────────────
+function paceToStr(p) {
+  const m = Math.floor(p), s = Math.round((p - m) * 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+function minToHHMM(totalMin) {
+  const h = Math.floor(totalMin / 60), m = Math.round(totalMin % 60);
+  return `${h}:${String(m).padStart(2, '0')}`;
+}
+
+function analyzePace() {
+  const allRuns = getRuns().filter(r => r.min && r.km >= 1);
+  if (!allRuns.length) return { status: 'none' };
+  if (allRuns.length < 3) return { status: 'few', count: allRuns.length };
+
+  const recent = allRuns.slice(-8);
+
+  // Weighted avg pace (linear weight: oldest=1, newest=N)
+  let wSum = 0, wTotal = 0;
+  recent.forEach((r, i) => {
+    const w = i + 1;
+    wSum += (r.min / r.km) * w;
+    wTotal += w;
+  });
+  const wAvgPace = wSum / wTotal;
+
+  // Separate commute vs long runs for better estimation
+  const longRuns    = recent.filter(r => r.type === 'long' && r.km >= 10);
+  const commuteRuns = recent.filter(r => r.type === 'commute');
+
+  let estMarathonPace;
+  if (longRuns.length >= 2) {
+    const lPace = longRuns.reduce((s, r) => s + r.min / r.km, 0) / longRuns.length;
+    const cPace = commuteRuns.length
+      ? commuteRuns.reduce((s, r) => s + r.min / r.km, 0) / commuteRuns.length
+      : null;
+    estMarathonPace = cPace
+      ? lPace * 0.94 * 0.65 + cPace * 0.87 * 0.35
+      : lPace * 0.94;
+  } else if (longRuns.length === 1) {
+    const lPace = longRuns[0].min / longRuns[0].km;
+    estMarathonPace = wAvgPace * 0.87 * 0.4 + lPace * 0.94 * 0.6;
+  } else {
+    // Commute runs only (easy pace)
+    estMarathonPace = wAvgPace * 0.87;
+  }
+
+  // Finish time
+  const finishMin = estMarathonPace * 42.195;
+
+  // Tier
+  const TIERS = [
+    { label:'サブ4圏内',   emoji:'🔥', color:'#C62828', maxPace: 240/42.195 },
+    { label:'サブ4:30圏内',emoji:'💪', color:'#E65100', maxPace: 270/42.195 },
+    { label:'サブ5圏内',   emoji:'👍', color:'#1565C0', maxPace: 300/42.195 },
+    { label:'サブ5へ向けて',emoji:'🏃', color:'#757575', maxPace: Infinity   },
+  ];
+  const tier = TIERS.find(t => estMarathonPace < t.maxPace);
+
+  // Trend (compare older half vs newer half)
+  let trend = null;
+  if (allRuns.length >= 4) {
+    const half = Math.ceil(allRuns.length / 2);
+    const older = allRuns.slice(0, -half);
+    const newer = allRuns.slice(-half);
+    const avgP = arr => arr.reduce((s, r) => s + r.min / r.km, 0) / arr.length;
+    const diff = avgP(older) - avgP(newer); // + = improving
+    if      (diff >  0.1) trend = { label:'上昇中 📈', bg:'#E8F5E9', color:'#2E7D32' };
+    else if (diff < -0.1) trend = { label:'注意 📉',   bg:'#FFEBEE', color:'#C62828' };
+    else                  trend = { label:'安定 ➡️',   bg:'#FFF3E0', color:'#E65100' };
+  }
+
+  // Recommended easy training pace
+  const easyLo = estMarathonPace + 0.75;
+  const easyHi = estMarathonPace + 1.33;
+
+  return {
+    status: 'ok',
+    dataCount: recent.length,
+    longRunCount: longRuns.length,
+    finishTime: minToHHMM(finishMin),
+    finishMin,
+    estMarathonPace,
+    tier, trend,
+    easyLo, easyHi,
+  };
+}
+
+function renderPaceAnalysis() {
+  const a = analyzePace();
+  const el = document.getElementById('paceAnalysis');
+
+  if (a.status === 'none') {
+    el.innerHTML = `<div class="pa-empty">
+      <div class="pa-empty-num">0</div>
+      <div class="pa-empty-msg">ランを記録すると<br>目標ペースを自動分析します</div>
+    </div>`;
+    return;
+  }
+  if (a.status === 'few') {
+    const need = 3 - a.count;
+    el.innerHTML = `<div class="pa-empty">
+      <div class="pa-empty-num">あと${need}回</div>
+      <div class="pa-empty-msg">ペース付きで記録すると<br>分析がスタートします</div>
+    </div>`;
+    return;
+  }
+
+  const trendHTML = a.trend
+    ? `<span class="pa-trend" style="background:${a.trend.bg};color:${a.trend.color}">${a.trend.label}</span>`
+    : '<span style="color:#ccc;font-size:0.8em">データ収集中</span>';
+
+  const confidence = a.longRunCount >= 2
+    ? '精度：高（ロング走データあり）'
+    : a.longRunCount === 1
+      ? '精度：中（ロング走1回）'
+      : '精度：低（通勤ランのみ・参考値）';
+
+  el.innerHTML = `
+    <div class="pa-top">
+      <div class="pa-time-block">
+        <div class="pa-time">${a.finishTime}</div>
+        <div class="pa-time-sub">予測フィニッシュタイム</div>
+      </div>
+      <div class="pa-tier" style="background:${a.tier.color}">${a.tier.emoji} ${a.tier.label}</div>
+    </div>
+    <div class="pa-rows">
+      <div class="pa-row">
+        <span class="pa-lbl">目標マラソンペース</span>
+        <span class="pa-val">${paceToStr(a.estMarathonPace)} /km</span>
+      </div>
+      <div class="pa-row">
+        <span class="pa-lbl">推奨トレーニングペース</span>
+        <span class="pa-val">${paceToStr(a.easyLo)}〜${paceToStr(a.easyHi)} /km</span>
+      </div>
+      <div class="pa-row">
+        <span class="pa-lbl">ペース推移</span>
+        <span class="pa-val">${trendHTML}</span>
+      </div>
+      <div class="pa-row">
+        <span class="pa-lbl">分析サンプル数</span>
+        <span class="pa-val">${a.dataCount}回</span>
+      </div>
+    </div>
+    <div class="pa-note">${confidence}・ロング走を記録するほど精度が上がります</div>
+  `;
+}
+
+// Apple Watch 取り込み
+async function importFromWatch() {
+  let text = '';
+  try {
+    text = await navigator.clipboard.readText();
+  } catch(e) {
+    alert('クリップボードの読み取りに失敗しました。\nショートカットを実行してからもう一度タップしてください。');
+    return;
+  }
+  let data;
+  try {
+    data = JSON.parse(text);
+    if (!data.km || !data.min) throw new Error();
+  } catch(e) {
+    alert('ショートカットを先に実行してください。\nクリップボードにランデータが見つかりません。');
+    return;
+  }
+  // フォームに自動セット
+  document.getElementById('fDate').value  = data.date || new Date().toLocaleDateString('sv');
+  document.getElementById('fType').value  = data.type || 'outdoor';
+  document.getElementById('fDist').value  = parseFloat(data.km).toFixed(2);
+  document.getElementById('fMin').value   = Math.round(data.min);
+  document.getElementById('fPace').value  = data.pace || '';
+  document.getElementById('fHR').value    = data.hr   || '';
+  document.getElementById('fNote').value  = data.note || 'Apple Watch';
+  document.getElementById('rpeLabel').textContent = 'タップして選択';
+  document.querySelectorAll('.rpe-btn').forEach(b => b.classList.remove('sel'));
+  if (data.rpe) selectRPE(parseInt(data.rpe));
+  onTypeChange();
+  document.getElementById('overlay').classList.add('open');
+}
+
+// Setup card
+function dismissSetup() {
+  localStorage.setItem('setup_done', '1');
+  document.getElementById('setupCard').style.display = 'none';
+}
+function initSetup() {
+  if (localStorage.getItem('setup_done')) {
+    const el = document.getElementById('setupCard');
+    if (el) el.style.display = 'none';
+  }
+}
+
+// Export / Import
+function exportData() {
+  const data = {
+    version: 1,
+    exported: new Date().toISOString(),
+    runs: getRuns(),
+    milestones: getMS(),
+  };
+  const json = JSON.stringify(data, null, 2);
+  // Try clipboard first
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(json).then(() => {
+      alert('データをクリップボードにコピーしました。\nメモアプリ等にペーストして保存してください。');
+    }).catch(() => showExportText(json));
+  } else {
+    showExportText(json);
+  }
+}
+function showExportText(json) {
+  const area = document.getElementById('importArea');
+  const ta = document.getElementById('importJson');
+  area.style.display = 'block';
+  ta.value = json;
+  ta.select();
+  alert('データを下のテキストエリアに表示しました。全選択してコピーしてください。');
+}
+function showImport() {
+  const area = document.getElementById('importArea');
+  area.style.display = area.style.display === 'none' ? 'block' : 'none';
+  document.getElementById('importJson').value = '';
+}
+function importData() {
+  const json = document.getElementById('importJson').value.trim();
+  if (!json) { alert('JSONをペーストしてください'); return; }
+  try {
+    const data = JSON.parse(json);
+    if (!data.runs || !Array.isArray(data.runs)) throw new Error('形式が正しくありません');
+    if (!confirm(`${data.runs.length}件のランデータをインポートします。現在のデータは上書きされます。よろしいですか？`)) return;
+    setRuns(data.runs);
+    if (data.milestones) setMS(data.milestones);
+    document.getElementById('importArea').style.display = 'none';
+    render();
+    renderPaceAnalysis();
+    alert('インポートが完了しました！');
+  } catch(e) {
+    alert('データの読み込みに失敗しました。\n正しいJSONをペーストしてください。');
+  }
+}
+
+render();
+renderWeekly();
+renderPaceAnalysis();
+initSetup();
+
+// Service Worker 登録（オフライン対応）
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
