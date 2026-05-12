@@ -766,8 +766,16 @@ function renderPaceAnalysis() {
         <span class="pa-val">${paceToStr(a.estMarathonPace)} /km</span>
       </div>
       <div class="pa-row">
-        <span class="pa-lbl">推奨トレーニングペース</span>
+        <span class="pa-lbl">通勤ラン目安</span>
+        <span class="pa-val">${paceToStr(a.easyLo + 0.12)}〜${paceToStr(a.easyHi + 0.12)} /km</span>
+      </div>
+      <div class="pa-row">
+        <span class="pa-lbl">屋内ラン目安</span>
         <span class="pa-val">${paceToStr(a.easyLo)}〜${paceToStr(a.easyHi)} /km</span>
+      </div>
+      <div class="pa-row">
+        <span class="pa-lbl">屋外ロング目安</span>
+        <span class="pa-val">${paceToStr(a.easyLo - 0.30)}〜${paceToStr(a.easyHi - 0.30)} /km</span>
       </div>
       <div class="pa-row">
         <span class="pa-lbl">ペース推移</span>
