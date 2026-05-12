@@ -743,7 +743,8 @@ function renderWeekly() {
 
 // ── Pace Analysis ───────────────────────────────────────────
 function paceToStr(p) {
-  const m = Math.floor(p), s = Math.round((p - m) * 60);
+  const total = Math.round(p * 60);
+  const m = Math.floor(total / 60), s = total % 60;
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 function minToHHMM(totalMin) {
@@ -813,9 +814,16 @@ function analyzePace() {
     else                  trend = { label:'安定 ➡️',   bg:'#FFF3E0', color:'#E65100' };
   }
 
-  // Recommended easy training pace
-  const easyLo = estMarathonPace + 0.75;
-  const easyHi = estMarathonPace + 1.33;
+  // Pace ranges per run type
+  // 屋内（短〜中距離）: マラソンペースより速め
+  const indoorLo = estMarathonPace - 0.25;
+  const indoorHi = estMarathonPace + 0.25;
+  // 通勤（短距離・荷物あり）: マラソンペース前後
+  const commuteLo = estMarathonPace - 0.10;
+  const commuteHi = estMarathonPace + 0.40;
+  // 屋外ロング: マラソンペースより遅め（持久力強化）
+  const easyLo = estMarathonPace + 0.50;
+  const easyHi = estMarathonPace + 1.00;
 
   return {
     status: 'ok',
@@ -826,6 +834,8 @@ function analyzePace() {
     estMarathonPace,
     tier, trend,
     easyLo, easyHi,
+    indoorLo, indoorHi,
+    commuteLo, commuteHi,
   };
 }
 
@@ -874,15 +884,15 @@ function renderPaceAnalysis() {
       </div>
       <div class="pa-row">
         <span class="pa-lbl">屋内ラン目安</span>
-        <span class="pa-val">${paceToStr(a.easyLo - 0.30)}〜${paceToStr(a.easyHi - 0.30)} /km</span>
+        <span class="pa-val">${paceToStr(a.indoorLo)}〜${paceToStr(a.indoorHi)} /km</span>
       </div>
       <div class="pa-row">
         <span class="pa-lbl">通勤ラン目安</span>
-        <span class="pa-val">${paceToStr(a.easyLo - 0.22)}〜${paceToStr(a.easyHi - 0.22)} /km</span>
+        <span class="pa-val">${paceToStr(a.commuteLo)}〜${paceToStr(a.commuteHi)} /km</span>
       </div>
       <div class="pa-row">
         <span class="pa-lbl">屋外ロング目安</span>
-        <span class="pa-val">${paceToStr(a.easyLo - 0.15)}〜${paceToStr(a.easyHi - 0.15)} /km</span>
+        <span class="pa-val">${paceToStr(a.easyLo)}〜${paceToStr(a.easyHi)} /km</span>
       </div>
       <div class="pa-row">
         <span class="pa-lbl">ペース推移</span>
@@ -1080,12 +1090,11 @@ function getWeeklyMenu(phaseIdx, weeksLeft, a, goalPace) {
   const pr = (lo, hi) => `${paceToStr(lo)}〜${paceToStr(hi)}/km`;
 
   // Pace ranges based on current ability
-  const baseLo = currentPace ? currentPace + 0.45 : 6.5;
-  const baseHi = currentPace ? currentPace + 1.00 : 7.5;
-  const easyPace = pr(baseLo, baseHi);
-  const commutePace = pr(baseLo - 0.22, baseHi - 0.22);
-  const indoorPace = pr(baseLo - 0.30, baseHi - 0.30);
-  const longPace = pr(baseLo - 0.15, baseHi - 0.15);
+  const mp = currentPace || 6.5;
+  const indoorPace  = pr(mp - 0.25, mp + 0.25);
+  const commutePace = pr(mp - 0.10, mp + 0.40);
+  const longPace    = pr(mp + 0.50, mp + 1.00);
+  const easyPace    = longPace;
 
   if (phaseIdx === 5 || weeksLeft <= 2) {
     // Taper
