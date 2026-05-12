@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>データ取り出し</title>
+<style>
+  body { font-family: -apple-system, sans-serif; padding: 30px 20px; background: #f0f2f5; }
+  h1 { font-size: 1.2em; margin-bottom: 20px; color: #023E8A; }
+  .card { background: white; border-radius: 14px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.07); }
+  textarea { width: 100%; height: 120px; font-size: 0.75em; border: 1px solid #ddd; border-radius: 8px; padding: 10px; }
+  button { width: 100%; padding: 14px; background: #023E8A; color: white; border: none; border-radius: 10px; font-size: 1em; margin-top: 10px; }
+  .ok { background: #4CAF50; }
+  .count { font-size: 0.9em; color: #666; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+<h1>📦 データ取り出し</h1>
+
+<div class="card">
+  <div class="count" id="count"></div>
+  <textarea id="dataBox" readonly></textarea>
+  <button onclick="copyData()">📋 コピーする</button>
+  <button class="ok" id="copyBtn" style="display:none" onclick="done()">✅ コピーできた！次のステップへ</button>
+</div>
+
+<div class="card" id="step2" style="display:none">
+  <p style="font-size:0.9em; line-height:1.6;">
+    1. Safariで新しいタブを開く<br>
+    2. <strong>https://yohei20000410.github.io/kobe-marathon/</strong> を開く<br>
+    3. 「バックアップ読み込み」→ コピーしたデータを貼り付けて完了！
+  </p>
+</div>
+
+<script>
+const runs = JSON.parse(localStorage.getItem('runs_kobe26') || '[]');
+const ms = JSON.parse(localStorage.getItem('ms_kobe26') || '{}');
+const data = { runs, ms };
+const json = JSON.stringify(data);
+
+document.getElementById('dataBox').value = json;
+document.getElementById('count').textContent = `記録：${runs.length}件のランデータが見つかりました`;
+
+function copyData() {
+  const box = document.getElementById('dataBox');
+  box.select();
+  box.setSelectionRange(0, 99999);
+  navigator.clipboard.writeText(json).then(() => {
+    document.getElementById('copyBtn').style.display = 'block';
+  }).catch(() => {
+    // フォールバック
+    document.execCommand('copy');
+    document.getElementById('copyBtn').style.display = 'block';
+  });
+}
+
+function done() {
+  document.getElementById('step2').style.display = 'block';
+}
+</script>
+</body>
+</html>
