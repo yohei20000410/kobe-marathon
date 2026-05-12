@@ -814,16 +814,16 @@ function analyzePace() {
     else                  trend = { label:'安定 ➡️',   bg:'#FFF3E0', color:'#E65100' };
   }
 
-  // Pace ranges per run type
-  // 屋内（短〜中距離）: マラソンペースより速め
-  const indoorLo = estMarathonPace - 0.25;
-  const indoorHi = estMarathonPace + 0.25;
-  // 通勤（短距離・荷物あり）: マラソンペース前後
-  const commuteLo = estMarathonPace - 0.10;
-  const commuteHi = estMarathonPace + 0.40;
-  // 屋外ロング: マラソンペースより遅め（持久力強化）
-  const easyLo = estMarathonPace + 0.50;
-  const easyHi = estMarathonPace + 1.00;
+  // Pace ranges per run type（すべてマラソンペースより速め）
+  // 屋内（かなり速め）
+  const indoorLo = estMarathonPace - 0.60;
+  const indoorHi = estMarathonPace - 0.15;
+  // 通勤（速め・荷物あり考慮）
+  const commuteLo = estMarathonPace - 0.40;
+  const commuteHi = estMarathonPace - 0.05;
+  // 屋外ロング（やや速め）
+  const easyLo = estMarathonPace - 0.20;
+  const easyHi = estMarathonPace + 0.15;
 
   return {
     status: 'ok',
@@ -1091,9 +1091,9 @@ function getWeeklyMenu(phaseIdx, weeksLeft, a, goalPace) {
 
   // Pace ranges based on current ability
   const mp = currentPace || 6.5;
-  const indoorPace  = pr(mp - 0.25, mp + 0.25);
-  const commutePace = pr(mp - 0.10, mp + 0.40);
-  const longPace    = pr(mp + 0.50, mp + 1.00);
+  const indoorPace  = pr(mp - 0.60, mp - 0.15);
+  const commutePace = pr(mp - 0.40, mp - 0.05);
+  const longPace    = pr(mp - 0.20, mp + 0.15);
   const easyPace    = longPace;
 
   if (phaseIdx === 5 || weeksLeft <= 2) {
