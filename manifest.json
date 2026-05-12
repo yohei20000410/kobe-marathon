@@ -1,7 +1,8 @@
 {
   "name": "神戸マラソン2026トラッカー",
   "short_name": "神戸Marathon",
-  "start_url": "/",
+  "start_url": "/kobe-marathon/",
+  "scope": "/kobe-marathon/",
   "display": "standalone",
   "background_color": "#023E8A",
   "theme_color": "#023E8A",
