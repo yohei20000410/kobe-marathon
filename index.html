@@ -599,7 +599,13 @@ function setRaceCfg(v) { localStorage.setItem(RACE_CFG_KEY, JSON.stringify(v)); 
 function addDaysStr(dateStr, n) {
   const d = toDate(dateStr); d.setDate(d.getDate() + n); return d.toLocaleDateString('sv');
 }
-function computePhases(startStr, raceStr) {
+// ペース（小数分）→ "M:SS" 文字列
+function fmtPaceMin(p) {
+  const total = Math.round(p * 60);
+  return `${Math.floor(total/60)}:${String(total%60).padStart(2,'0')}`;
+}
+
+function computePhases(startStr, raceStr, goalMin) {
   const totalDays = Math.ceil((toDate(raceStr) - toDate(startStr)) / 86400000);
   const baseFixed = 49 + 49 + 28 + 21 + 14; // 161日
   let d;
@@ -617,13 +623,40 @@ function computePhases(startStr, raceStr) {
   const p4s=addDaysStr(p3e,1), p4e=addDaysStr(p4s,d.ph4-1);
   const bs=addDaysStr(p4e,1),  be=addDaysStr(bs,d.buf-1);
   const ts=addDaysStr(be,1),   te=raceStr;
+
+  // 目標タイムからフェーズ別練習ペースを算出
+  // 本番ペース基準に各フェーズで段階的に追い込む
+  const gMin = goalMin || 240;
+  const racePace = gMin / 42.195; // 本番目標ペース（分/km）
+  // フェーズ別目安ペース：本番より余裕を持ち、後半フェーズほど速く
+  const p2pace = racePace + 1.0;  // Phase2: 本番+1:00/km（10kmゆっくり完走）
+  const p3pace = racePace + 0.6;  // Phase3: 本番+0:36/km（ハーフ）
+  const p4pace = racePace + 0.25; // Phase4: 本番+0:15/km（30km）
+  const bufPace = racePace;       // バッファー: 本番ペースそのもの
+
+  // 目標タイム文字列 例: 4:00:00
+  const raceHH = Math.floor(gMin/60), raceMM = gMin%60;
+  const raceTimeStr = `${raceHH}:${String(raceMM).padStart(2,'0')}`;
+
   return [
-    { name:'Phase 1', sub:'走れる体を作る',    start:p1s,end:p1e, goal:'目標：3.9kmを止まらず走れる',          color:'#4CAF50' },
-    { name:'Phase 2', sub:'10km完走',          start:p2s,end:p2e, goal:'目標：10km走れる',                    color:'#2196F3' },
-    { name:'Phase 3', sub:'ハーフ〜25km領域',  start:p3s,end:p3e, goal:'目標：ハーフ（21km）完走',            color:'#9C27B0' },
-    { name:'Phase 4', sub:'フルマラソン仕上げ',start:p4s,end:p4e, goal:'目標：30km走完了',                    color:'#FF5722' },
-    { name:'バッファー',sub:'調整期',          start:bs, end:be,  goal:'体調管理・最終調整・目標ペース確認',    color:'#FF9800' },
-    { name:'テーパー', sub:'本番準備',         start:ts, end:te,  goal:'軽いジョグのみ・装備・睡眠・食事管理', color:'#607D8B' },
+    { name:'Phase 1', sub:'走れる体を作る',    start:p1s,end:p1e,
+      goal:`目標：3.9kmを止まらず走れる\nペースは気にせずまず走り続ける`,
+      color:'#4CAF50' },
+    { name:'Phase 2', sub:'10km完走',          start:p2s,end:p2e,
+      goal:`目標：10km完走\n目安ペース ${fmtPaceMin(p2pace)}/km`,
+      color:'#2196F3' },
+    { name:'Phase 3', sub:'ハーフ〜25km領域',  start:p3s,end:p3e,
+      goal:`目標：ハーフ（21km）完走\n目安ペース ${fmtPaceMin(p3pace)}/km`,
+      color:'#9C27B0' },
+    { name:'Phase 4', sub:'フルマラソン仕上げ',start:p4s,end:p4e,
+      goal:`目標：30km走完了\n目安ペース ${fmtPaceMin(p4pace)}/km`,
+      color:'#FF5722' },
+    { name:'バッファー',sub:'調整期',          start:bs, end:be,
+      goal:`体調管理・最終調整\n目標ペース ${fmtPaceMin(bufPace)}/km で10km確認`,
+      color:'#FF9800' },
+    { name:'テーパー', sub:'本番準備',         start:ts, end:te,
+      goal:`目標タイム ${raceTimeStr}（${fmtPaceMin(racePace)}/km）\n軽いジョグのみ・装備・睡眠・食事管理`,
+      color:'#607D8B' },
   ];
 }
 
@@ -632,7 +665,7 @@ function applyRaceCfg() {
   const cfg = getRaceCfg();
   RACE_DATE_STR = cfg.date;
   RACE_DATE     = toDate(cfg.date);
-  PHASES        = computePhases(cfg.startDate, cfg.date);
+  PHASES        = computePhases(cfg.startDate, cfg.date, cfg.goalMin);
   // ゴール
   localStorage.setItem('goal_kobe26', cfg.goalMin);
   // ヘッダー更新
@@ -801,7 +834,7 @@ function renderPhaseCard() {
           <div class="phase-name">${p.name}：${p.sub}</div>${statusTag}
         </div>
       </div>
-      <div class="phase-goal">${p.goal}</div>
+      <div class="phase-goal">${p.goal.replace(/\n/g,'<br>')}</div>
       <div class="phase-deadline">目安期間：<strong>${p.start.slice(5).replace('-','/')} 〜 ${p.end.slice(5).replace('-','/')}</strong></div>
       ${progSection}
     </div>
