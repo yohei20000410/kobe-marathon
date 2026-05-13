@@ -898,22 +898,32 @@ function getDistanceWeight(km) {
   return Math.pow(ratio, 1.5); // 1km≈0.4%, 5km≈3%, 10km≈7%, 21km≈22%, 30km≈40%, 42km≈100%
 }
 
+// 日付による重み（半減期30日の指数減衰、90日超は除外）
+function getTimeWeight(dateStr) {
+  const runDate = new Date(dateStr + 'T00:00:00');
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const daysAgo = Math.max(0, (today - runDate) / 86400000);
+  if (daysAgo > 90) return 0; // 3か月超は除外
+  return Math.exp(-daysAgo * Math.LN2 / 30); // 半減期30日
+  // 7日前≈86%、14日前≈73%、30日前≈50%、60日前≈25%、90日前≈12.5%
+}
+
 function analyzePace() {
   const allRuns = getRuns().filter(r => r.min && r.km >= 1);
   if (!allRuns.length) return { status: 'none' };
-  if (allRuns.length < 3) return { status: 'few', count: allRuns.length };
 
-  const recent = allRuns.slice(-10);
-  const n = recent.length;
+  // 90日以内のランのみ対象
+  const recent = allRuns.filter(r => getTimeWeight(r.date) > 0);
+  if (recent.length < 3) return { status: 'few', count: recent.length };
 
-  // 距離×直近の複合重み付き平均でマラソンペースを推定
+  // 距離×時間の複合重み付き平均でマラソンペースを推定
   let wSum = 0, wTotal = 0;
-  recent.forEach((r, i) => {
+  recent.forEach(r => {
     const rawPace = r.min / r.km;
-    const distW    = getDistanceWeight(r.km);
-    const recencyW = (i + 1) / n; // 0〜1、新しいほど高い
-    const w = distW * (0.4 + 0.6 * recencyW); // 距離重視、直近補正あり
-    const estPace  = rawPace * getMarathonFactor(r.km);
+    const distW = getDistanceWeight(r.km);
+    const timeW = getTimeWeight(r.date);
+    const w = distW * timeW; // 長距離かつ直近ほど重視
+    const estPace = rawPace * getMarathonFactor(r.km);
     wSum   += estPace * w;
     wTotal += w;
   });
@@ -936,10 +946,10 @@ function analyzePace() {
 
   // Trend (compare older half vs newer half)
   let trend = null;
-  if (allRuns.length >= 4) {
-    const half = Math.ceil(allRuns.length / 2);
-    const older = allRuns.slice(0, -half);
-    const newer = allRuns.slice(-half);
+  if (recent.length >= 4) {
+    const half = Math.ceil(recent.length / 2);
+    const older = recent.slice(0, -half);
+    const newer = recent.slice(-half);
     const avgP = arr => arr.reduce((s, r) => s + r.min / r.km, 0) / arr.length;
     const diff = avgP(older) - avgP(newer); // + = improving
     if      (diff >  0.1) trend = { label:'上昇中 📈', bg:'#E8F5E9', color:'#2E7D32' };
