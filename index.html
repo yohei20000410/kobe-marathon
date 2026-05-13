@@ -880,42 +880,47 @@ function minToHHMM(totalMin) {
   return `${h}:${String(m).padStart(2, '0')}`;
 }
 
+// 距離からマラソンペース換算係数を取得
+// 長い距離ほど換算係数が1に近い（補正が小さい）
+function getMarathonFactor(km) {
+  if (km >= 35) return 0.98;
+  if (km >= 25) return 0.95;
+  if (km >= 15) return 0.92;
+  if (km >= 10) return 0.89;
+  if (km >= 5)  return 0.87;
+  if (km >= 3)  return 0.85;
+  return 0.83;
+}
+
+// 距離による重み（フルマラソンに近いほど指数的に重くなる）
+function getDistanceWeight(km) {
+  const ratio = Math.min(km, 42.195) / 42.195;
+  return Math.pow(ratio, 1.5); // 1km≈0.4%, 5km≈3%, 10km≈7%, 21km≈22%, 30km≈40%, 42km≈100%
+}
+
 function analyzePace() {
   const allRuns = getRuns().filter(r => r.min && r.km >= 1);
   if (!allRuns.length) return { status: 'none' };
   if (allRuns.length < 3) return { status: 'few', count: allRuns.length };
 
-  const recent = allRuns.slice(-8);
+  const recent = allRuns.slice(-10);
+  const n = recent.length;
 
-  // Weighted avg pace (linear weight: oldest=1, newest=N)
+  // 距離×直近の複合重み付き平均でマラソンペースを推定
   let wSum = 0, wTotal = 0;
   recent.forEach((r, i) => {
-    const w = i + 1;
-    wSum += (r.min / r.km) * w;
+    const rawPace = r.min / r.km;
+    const distW    = getDistanceWeight(r.km);
+    const recencyW = (i + 1) / n; // 0〜1、新しいほど高い
+    const w = distW * (0.4 + 0.6 * recencyW); // 距離重視、直近補正あり
+    const estPace  = rawPace * getMarathonFactor(r.km);
+    wSum   += estPace * w;
     wTotal += w;
   });
-  const wAvgPace = wSum / wTotal;
+  const estMarathonPace = wTotal > 0 ? wSum / wTotal : recent[recent.length-1].min / recent[recent.length-1].km * 0.87;
 
-  // Separate commute vs long runs for better estimation
-  const longRuns    = recent.filter(r => r.type === 'long' && r.km >= 10);
-  const commuteRuns = recent.filter(r => r.type === 'commute');
-
-  let estMarathonPace;
-  if (longRuns.length >= 2) {
-    const lPace = longRuns.reduce((s, r) => s + r.min / r.km, 0) / longRuns.length;
-    const cPace = commuteRuns.length
-      ? commuteRuns.reduce((s, r) => s + r.min / r.km, 0) / commuteRuns.length
-      : null;
-    estMarathonPace = cPace
-      ? lPace * 0.94 * 0.65 + cPace * 0.87 * 0.35
-      : lPace * 0.94;
-  } else if (longRuns.length === 1) {
-    const lPace = longRuns[0].min / longRuns[0].km;
-    estMarathonPace = wAvgPace * 0.87 * 0.4 + lPace * 0.94 * 0.6;
-  } else {
-    // Commute runs only (easy pace)
-    estMarathonPace = wAvgPace * 0.87;
-  }
+  // ロングランの数（精度表示用）
+  const longRuns = recent.filter(r => r.km >= 10);
 
   // Finish time
   const finishMin = estMarathonPace * 42.195;
