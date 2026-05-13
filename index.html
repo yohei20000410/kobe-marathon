@@ -378,9 +378,12 @@ html, body {
 
   <!-- 常時表示ヘッダー -->
   <div class="header" id="mainHeader">
-    <h1>🏃 神戸マラソン 2026</h1>
+    <div style="display:flex;align-items:center;justify-content:center;gap:8px;position:relative">
+      <h1 id="headerRaceName" style="margin:0">🏃 神戸マラソン 2026</h1>
+      <button onclick="openSettings()" style="position:absolute;right:0;background:rgba(255,255,255,0.2);border:none;border-radius:50%;width:32px;height:32px;font-size:1em;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center">⚙</button>
+    </div>
     <div class="countdown-num" id="countdownNum">---</div>
-    <div class="countdown-label">日後スタート（11月22日）</div>
+    <div class="countdown-label" id="headerCountdownLabel">日後スタート（11月22日）</div>
     <div class="phase-badge" id="headerPhase">---</div>
     <div id="lotterySection"></div>
   </div>
@@ -460,6 +463,43 @@ html, body {
   <!-- FABボタン -->
   <button class="fab" onclick="openModal()" title="ランを記録する">＋</button>
 
+</div>
+
+<!-- 設定シート -->
+<div class="day-popup-overlay" id="settingsOverlay" onclick="closeSettings(event)">
+  <div class="day-popup" id="settingsSheet" style="padding-bottom:calc(28px + env(safe-area-inset-bottom))">
+    <div class="day-popup-header">
+      <div class="day-popup-date">⚙️ 大会設定</div>
+      <button class="day-popup-close" onclick="closeSettings()">✕</button>
+    </div>
+    <div class="fg" style="margin-bottom:12px">
+      <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">大会名</label>
+      <input type="text" id="sCfgName" placeholder="例: 神戸マラソン 2026" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
+    </div>
+    <div class="fg" style="margin-bottom:12px">
+      <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">開催日</label>
+      <input type="date" id="sCfgDate" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
+    </div>
+    <div class="fg" style="margin-bottom:12px">
+      <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">目標タイム</label>
+      <select id="sCfgGoalSel" onchange="onGoalSelChange()" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
+        <option value="210">サブ3:30（3時間30分）</option>
+        <option value="240">サブ4（4時間）</option>
+        <option value="270">サブ4:30（4時間30分）</option>
+        <option value="300">サブ5（5時間）</option>
+        <option value="0">カスタム</option>
+      </select>
+    </div>
+    <div class="fg" id="sCfgCustomWrap" style="margin-bottom:12px;display:none">
+      <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">目標タイム（分）</label>
+      <input type="number" id="sCfgGoalMin" placeholder="例: 255（=4時間15分）" min="120" max="600" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
+    </div>
+    <div class="fg" style="margin-bottom:20px">
+      <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">トレーニング開始日</label>
+      <input type="date" id="sCfgStart" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
+    </div>
+    <button onclick="saveSettings()" style="width:100%;padding:14px;background:#023E8A;color:white;border:none;border-radius:12px;font-size:1em;font-weight:700">保存する</button>
+  </div>
 </div>
 
 <!-- 日付詳細ポップアップ -->
@@ -546,17 +586,68 @@ html, body {
 
 <script>
 const STATION_KM = 1.3;
-const RACE_DATE_STR = '2026-11-22';
-const RACE_DATE = new Date(RACE_DATE_STR + 'T00:00:00');
 
-const PHASES = [
-  { name:'Phase 1', sub:'走れる体を作る',       start:'2026-05-11', end:'2026-06-15', goal:'目標：3.9kmを止まらず走れる',           color:'#4CAF50' },
-  { name:'Phase 2', sub:'10km完走',             start:'2026-06-16', end:'2026-08-03', goal:'目標：10km走れる',                     color:'#2196F3' },
-  { name:'Phase 3', sub:'ハーフ〜25km領域',      start:'2026-08-04', end:'2026-09-21', goal:'目標：ハーフ（21km）完走',             color:'#9C27B0' },
-  { name:'Phase 4', sub:'フルマラソン仕上げ',    start:'2026-09-22', end:'2026-10-19', goal:'目標：30km走完了',                     color:'#FF5722' },
-  { name:'バッファー', sub:'調整期',             start:'2026-10-20', end:'2026-11-08', goal:'体調管理・最終調整・目標ペース確認',     color:'#FF9800' },
-  { name:'テーパー', sub:'本番準備',             start:'2026-11-09', end:'2026-11-22', goal:'軽いジョグのみ・装備・睡眠・食事管理',  color:'#607D8B' },
-];
+// ── 設定管理 ──────────────────────────────────
+const RACE_CFG_KEY = 'race_cfg';
+const RACE_CFG_DEFAULT = { name:'神戸マラソン 2026', date:'2026-11-22', goalMin:240, startDate:'2026-05-11' };
+function getRaceCfg() {
+  return { ...RACE_CFG_DEFAULT, ...JSON.parse(localStorage.getItem(RACE_CFG_KEY) || '{}') };
+}
+function setRaceCfg(v) { localStorage.setItem(RACE_CFG_KEY, JSON.stringify(v)); }
+
+// ── フェーズ自動計算 ──────────────────────────
+function addDaysStr(dateStr, n) {
+  const d = toDate(dateStr); d.setDate(d.getDate() + n); return d.toLocaleDateString('sv');
+}
+function computePhases(startStr, raceStr) {
+  const totalDays = Math.ceil((toDate(raceStr) - toDate(startStr)) / 86400000);
+  const baseFixed = 49 + 49 + 28 + 21 + 14; // 161日
+  let d;
+  if (totalDays < baseFixed + 14) {
+    const s = Math.max(0.3, totalDays / (baseFixed + 14));
+    d = { ph1: Math.max(7, Math.round(14*s)), ph2: Math.max(7, Math.round(49*s)),
+          ph3: Math.max(7, Math.round(49*s)), ph4: Math.max(7, Math.round(28*s)),
+          buf: Math.max(5, Math.round(21*s)), tap: Math.max(5, Math.round(14*s)) };
+  } else {
+    d = { ph1: totalDays - baseFixed, ph2:49, ph3:49, ph4:28, buf:21, tap:14 };
+  }
+  const p1s=startStr, p1e=addDaysStr(p1s,d.ph1-1);
+  const p2s=addDaysStr(p1e,1), p2e=addDaysStr(p2s,d.ph2-1);
+  const p3s=addDaysStr(p2e,1), p3e=addDaysStr(p3s,d.ph3-1);
+  const p4s=addDaysStr(p3e,1), p4e=addDaysStr(p4s,d.ph4-1);
+  const bs=addDaysStr(p4e,1),  be=addDaysStr(bs,d.buf-1);
+  const ts=addDaysStr(be,1),   te=raceStr;
+  return [
+    { name:'Phase 1', sub:'走れる体を作る',    start:p1s,end:p1e, goal:'目標：3.9kmを止まらず走れる',          color:'#4CAF50' },
+    { name:'Phase 2', sub:'10km完走',          start:p2s,end:p2e, goal:'目標：10km走れる',                    color:'#2196F3' },
+    { name:'Phase 3', sub:'ハーフ〜25km領域',  start:p3s,end:p3e, goal:'目標：ハーフ（21km）完走',            color:'#9C27B0' },
+    { name:'Phase 4', sub:'フルマラソン仕上げ',start:p4s,end:p4e, goal:'目標：30km走完了',                    color:'#FF5722' },
+    { name:'バッファー',sub:'調整期',          start:bs, end:be,  goal:'体調管理・最終調整・目標ペース確認',    color:'#FF9800' },
+    { name:'テーパー', sub:'本番準備',         start:ts, end:te,  goal:'軽いジョグのみ・装備・睡眠・食事管理', color:'#607D8B' },
+  ];
+}
+
+// 起動時・設定変更時に再初期化
+function applyRaceCfg() {
+  const cfg = getRaceCfg();
+  RACE_DATE_STR = cfg.date;
+  RACE_DATE     = toDate(cfg.date);
+  PHASES        = computePhases(cfg.startDate, cfg.date);
+  // ゴール
+  localStorage.setItem('goal_kobe26', cfg.goalMin);
+  // ヘッダー更新
+  const raceD = toDate(cfg.date);
+  document.getElementById('headerRaceName').textContent = '🏃 ' + cfg.name;
+  document.getElementById('headerCountdownLabel').textContent =
+    `日後スタート（${raceD.getMonth()+1}月${raceD.getDate()}日）`;
+  // マイルストーン最終行更新
+  const ms6 = MILESTONES.find(m => m.id === 'm6');
+  if (ms6) { ms6.text = cfg.name + '完走！！ 🏅'; ms6.date = `${raceD.getMonth()+1}/${raceD.getDate()}`; }
+}
+
+let RACE_DATE_STR = '';
+let RACE_DATE     = null;
+let PHASES        = [];
 
 const MILESTONES = [
   // ── 6月 ──
@@ -1559,6 +1650,46 @@ function closeDayPopup(e) {
   document.getElementById('dayPopupOverlay').classList.remove('open');
 }
 
+// ── 設定シート ───────────────────────────────────────────────
+function openSettings() {
+  const cfg = getRaceCfg();
+  document.getElementById('sCfgName').value = cfg.name;
+  document.getElementById('sCfgDate').value = cfg.date;
+  document.getElementById('sCfgStart').value = cfg.startDate;
+  const preset = [210,240,270,300];
+  if (preset.includes(cfg.goalMin)) {
+    document.getElementById('sCfgGoalSel').value = String(cfg.goalMin);
+    document.getElementById('sCfgCustomWrap').style.display = 'none';
+  } else {
+    document.getElementById('sCfgGoalSel').value = '0';
+    document.getElementById('sCfgGoalMin').value = cfg.goalMin;
+    document.getElementById('sCfgCustomWrap').style.display = 'block';
+  }
+  document.getElementById('settingsOverlay').classList.add('open');
+}
+function closeSettings(e) {
+  if (e && e.target !== document.getElementById('settingsOverlay')) return;
+  document.getElementById('settingsOverlay').classList.remove('open');
+}
+function onGoalSelChange() {
+  document.getElementById('sCfgCustomWrap').style.display =
+    document.getElementById('sCfgGoalSel').value === '0' ? 'block' : 'none';
+}
+function saveSettings() {
+  const name  = document.getElementById('sCfgName').value.trim() || RACE_CFG_DEFAULT.name;
+  const date  = document.getElementById('sCfgDate').value || RACE_CFG_DEFAULT.date;
+  const start = document.getElementById('sCfgStart').value || RACE_CFG_DEFAULT.startDate;
+  const sel   = document.getElementById('sCfgGoalSel').value;
+  const goalMin = sel === '0'
+    ? (parseInt(document.getElementById('sCfgGoalMin').value) || 240)
+    : parseInt(sel);
+  setRaceCfg({ name, date, goalMin, startDate: start });
+  applyRaceCfg();
+  localStorage.removeItem('phaseIdx_kobe26'); // フェーズをリセット
+  closeSettings();
+  refreshAll();
+}
+
 function refreshAll() {
   render();
   renderLottery();
@@ -1569,6 +1700,7 @@ function refreshAll() {
   renderTrainingPlan();
 }
 
+applyRaceCfg();
 render();
 renderLottery();
 renderPhaseCard();
