@@ -31,17 +31,41 @@ html, body {
   flex-shrink: 0;
   background: linear-gradient(135deg, #023E8A 0%, #0077B6 100%);
   color: white;
-  padding: calc(16px + env(safe-area-inset-top)) 20px 18px;
+  padding: calc(14px + env(safe-area-inset-top)) 20px 16px;
   text-align: center;
+  transition: padding 0.3s ease;
+  overflow: hidden;
 }
-.header h1 { font-size: 1.0em; opacity: 0.9; margin-bottom: 6px; letter-spacing: 0.5px; }
-.countdown-num { font-size: 2.8em; font-weight: 800; color: #FFD60A; line-height: 1; }
-.countdown-label { font-size: 0.8em; opacity: 0.7; margin-top: 3px; }
+.header.compact {
+  padding: calc(6px + env(safe-area-inset-top)) 20px 8px;
+}
+.header h1 { font-size: 1.0em; opacity: 0.9; margin-bottom: 4px; letter-spacing: 0.5px; transition: font-size 0.3s; }
+.header.compact h1 { font-size: 0.78em; margin-bottom: 2px; }
+.countdown-num { font-size: 2.8em; font-weight: 800; color: #FFD60A; line-height: 1; transition: font-size 0.3s; }
+.header.compact .countdown-num { font-size: 1.8em; }
+.countdown-label { font-size: 0.8em; opacity: 0.7; margin-top: 3px; transition: all 0.3s; }
+.header.compact .countdown-label { font-size: 0.7em; margin-top: 1px; }
 .phase-badge {
-  display: inline-block; margin-top: 10px;
+  display: inline-block; margin-top: 8px;
   background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
   border-radius: 20px; padding: 4px 12px; font-size: 0.82em;
+  transition: all 0.3s; max-height: 40px; opacity: 1;
 }
+.header.compact .phase-badge { max-height: 0; opacity: 0; margin-top: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; }
+
+/* 当選カウントダウン */
+.lottery-row {
+  display: flex; justify-content: center; align-items: center; gap: 8px;
+  margin-top: 8px; transition: all 0.3s; max-height: 40px; opacity: 1;
+}
+.header.compact .lottery-row { max-height: 0; opacity: 0; margin-top: 0; overflow: hidden; }
+.lottery-label { font-size: 0.72em; opacity: 0.8; }
+.lottery-days { font-size: 1.1em; font-weight: 800; color: #FFD60A; }
+.lottery-divider {
+  height: 1px; background: rgba(255,255,255,0.2);
+  margin: 8px 0 0; transition: all 0.3s;
+}
+.header.compact .lottery-divider { max-height: 0; margin: 0; overflow: hidden; }
 
 /* ── Tab bar ── */
 .tab-bar {
@@ -65,26 +89,44 @@ html, body {
 .tab-content.active { display: block; }
 .container { max-width: 600px; margin: 0 auto; padding: 16px 16px 0; }
 
-/* ── Fixed bottom bar ── */
-.bottom-bar {
-  flex-shrink: 0;
-  background: white; border-top: 1px solid #e8e8e8;
-  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+/* ── FAB ── */
+.fab {
+  position: fixed;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  right: 24px;
+  width: 58px; height: 58px;
+  background: #E85D04; color: white;
+  border: none; border-radius: 50%;
+  font-size: 2em; font-weight: 300; line-height: 1;
+  box-shadow: 0 4px 16px rgba(232,93,4,0.45);
+  cursor: pointer; z-index: 150;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.15s;
 }
-.bottom-bar .btn-log {
-  width: 100%; padding: 15px; background: #E85D04; color: white;
-  border: none; border-radius: 12px; font-size: 1.0em; font-weight: 700;
-  cursor: pointer; letter-spacing: 0.3px;
-  box-shadow: 0 3px 10px rgba(232,93,4,0.3); font-family: inherit;
+.fab:active { transform: scale(0.92); }
+
+/* ── Calendar ── */
+.cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.cal-title { font-size: 1em; font-weight: 700; }
+.cal-nav { background: none; border: none; font-size: 1.2em; color: #023E8A; cursor: pointer; padding: 4px 10px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cal-dow { text-align: center; font-size: 0.68em; color: #999; padding: 4px 0; font-weight: 600; }
+.cal-dow.sun { color: #E53935; }
+.cal-dow.sat { color: #1565C0; }
+.cal-day {
+  aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+  font-size: 0.82em; border-radius: 50%; position: relative; cursor: default;
 }
-.bottom-bar .btn-watch {
-  width: 100%; padding: 10px; margin-top: 8px;
-  background: white; color: #1C1C1E;
-  border: 1.5px solid #ddd; border-radius: 10px;
-  font-size: 0.88em; font-weight: 600; cursor: pointer;
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  font-family: inherit;
+.cal-day.other-month { color: #ccc; }
+.cal-day.sun { color: #E53935; }
+.cal-day.sat { color: #1565C0; }
+.cal-day.has-run { font-weight: 800; }
+.cal-day .run-dot-cal {
+  position: absolute; bottom: 1px; left: 50%; transform: translateX(-50%);
+  width: 5px; height: 5px; border-radius: 50%;
 }
+.cal-day.today-marker { border: 2px solid #023E8A; border-radius: 50%; }
+.cal-day.run-bg { border-radius: 50%; color: white !important; font-weight: 800; }
 
 .card {
   background: white; border-radius: 14px; padding: 18px;
@@ -294,11 +336,12 @@ html, body {
 <div class="app-shell">
 
   <!-- 常時表示ヘッダー -->
-  <div class="header">
+  <div class="header" id="mainHeader">
     <h1>🏃 神戸マラソン 2026</h1>
     <div class="countdown-num" id="countdownNum">---</div>
     <div class="countdown-label">日後スタート（11月22日）</div>
     <div class="phase-badge" id="headerPhase">---</div>
+    <div id="lotterySection"></div>
   </div>
 
   <!-- タブバー -->
@@ -323,6 +366,10 @@ html, body {
         </div>
       </div>
       <div class="card">
+        <div class="card-title">カレンダー</div>
+        <div id="calendarView"></div>
+      </div>
+      <div class="card">
         <div class="card-title">週間進捗</div>
         <div id="weeklyProgress"></div>
       </div>
@@ -330,7 +377,7 @@ html, body {
         <div class="card-title">目標ペース分析（自動）</div>
         <div id="paceAnalysis"></div>
       </div>
-      <div class="card" style="margin-bottom:16px">
+      <div class="card" style="margin-bottom:90px">
         <div class="card-title">今週の練習メニュー提案</div>
         <div id="trainingPlan"></div>
       </div>
@@ -341,14 +388,20 @@ html, body {
   <div class="tab-content" id="tab-records">
     <div class="container">
       <div class="card" style="margin-top:0">
-        <div class="card-title">マイルストーン</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <div class="card-title" style="margin-bottom:0">マイルストーン</div>
+        </div>
         <div id="msList"></div>
       </div>
       <div class="card">
         <div class="card-title">ラン履歴</div>
         <div id="runList"></div>
       </div>
-      <div class="card" style="margin-bottom:16px">
+      <div class="card">
+        <div class="card-title">Apple Watch</div>
+        <button class="btn-watch" onclick="importFromWatch()" style="margin-top:0">⌚ Apple Watch から取り込む</button>
+      </div>
+      <div class="card" style="margin-bottom:90px">
         <div class="card-title">データのバックアップ</div>
         <div class="backup-note">アプリ更新後もデータは自動で引き継がれます。<br>念のためバックアップも可能です。</div>
         <div class="backup-btns">
@@ -363,11 +416,8 @@ html, body {
     </div>
   </div>
 
-  <!-- 常時表示ボタン -->
-  <div class="bottom-bar">
-    <button class="btn-log" onclick="openModal()">＋　ランを記録する</button>
-    <button class="btn-watch" onclick="importFromWatch()">⌚ Apple Watch から取り込む</button>
-  </div>
+  <!-- FABボタン -->
+  <button class="fab" onclick="openModal()" title="ランを記録する">＋</button>
 
 </div>
 
@@ -1224,7 +1274,7 @@ function getWeeklyMenu(phaseIdx, weeksLeft, a, goalPace) {
   };
 }
 
-// Tab switching
+// ── Tab switching ───────────────────────────────────────────
 function switchTab(name) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -1232,10 +1282,104 @@ function switchTab(name) {
   document.getElementById('tab-btn-' + name).classList.add('active');
 }
 
-function refreshAll() { render(); renderPhaseCard(); renderWeekly(); renderPaceAnalysis(); renderTrainingPlan(); }
+// ── Header collapse on scroll ───────────────────────────────
+document.getElementById('tab-home').addEventListener('scroll', function() {
+  const header = document.getElementById('mainHeader');
+  if (this.scrollTop > 40) header.classList.add('compact');
+  else header.classList.remove('compact');
+});
+
+// ── Lottery countdown ────────────────────────────────────────
+const LOTTERY_DATE = new Date('2026-07-01T00:00:00'); // 当選発表日（要確認）
+function renderLottery() {
+  const el = document.getElementById('lotterySection');
+  const now = today();
+  const diff = Math.ceil((LOTTERY_DATE - now) / 86400000);
+  if (diff <= 0) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <div class="lottery-divider"></div>
+    <div class="lottery-row">
+      <span class="lottery-label">🎫 当選発表まで</span>
+      <span class="lottery-days">${diff}日</span>
+    </div>`;
+}
+
+// ── Calendar ─────────────────────────────────────────────────
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth();
+
+function renderCalendar(year, month) {
+  calYear = year; calMonth = month;
+  const runs = getRuns();
+  const runMap = {};
+  runs.forEach(r => {
+    if (!runMap[r.date]) runMap[r.date] = [];
+    runMap[r.date].push(r);
+  });
+
+  const TYPE_COLORS_CAL = { commute:'#0077B6', outdoor:'#4CAF50', indoor:'#FF9800' };
+  const todayStr = new Date().toLocaleDateString('sv');
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const startDow = firstDay.getDay();
+  const dows = ['日','月','火','水','木','金','土'];
+
+  let cells = '';
+  // day-of-week headers
+  dows.forEach((d, i) => {
+    const cls = i===0?'sun':i===6?'sat':'';
+    cells += `<div class="cal-dow ${cls}">${d}</div>`;
+  });
+
+  // blank cells before month starts
+  for (let i = 0; i < startDow; i++) cells += `<div class="cal-day other-month"></div>`;
+
+  // day cells
+  for (let d = 1; d <= lastDay.getDate(); d++) {
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dayRuns = runMap[dateStr] || [];
+    const dow = (startDow + d - 1) % 7;
+    const isToday = dateStr === todayStr;
+    const dowCls = dow===0?'sun':dow===6?'sat':'';
+
+    if (dayRuns.length > 0) {
+      const color = TYPE_COLORS_CAL[dayRuns[0].type] || '#023E8A';
+      cells += `<div class="cal-day run-bg has-run ${dowCls}" style="background:${color}" title="${dayRuns.map(r=>r.km+'km').join(', ')}">${d}</div>`;
+    } else {
+      cells += `<div class="cal-day ${dowCls}${isToday?' today-marker':''}">${d}</div>`;
+    }
+  }
+
+  // fill remaining
+  const total = startDow + lastDay.getDate();
+  const rem = total % 7 === 0 ? 0 : 7 - (total % 7);
+  for (let i = 0; i < rem; i++) cells += `<div class="cal-day other-month"></div>`;
+
+  const monthNames = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  document.getElementById('calendarView').innerHTML = `
+    <div class="cal-header">
+      <button class="cal-nav" onclick="renderCalendar(${month===0?year-1:year},${month===0?11:month-1})">‹</button>
+      <div class="cal-title">${year}年 ${monthNames[month]}</div>
+      <button class="cal-nav" onclick="renderCalendar(${month===11?year+1:year},${month===11?0:month+1})">›</button>
+    </div>
+    <div class="cal-grid">${cells}</div>
+  `;
+}
+
+function refreshAll() {
+  render();
+  renderLottery();
+  renderPhaseCard();
+  renderCalendar(calYear, calMonth);
+  renderWeekly();
+  renderPaceAnalysis();
+  renderTrainingPlan();
+}
 
 render();
+renderLottery();
 renderPhaseCard();
+renderCalendar(calYear, calMonth);
 renderWeekly();
 renderPaceAnalysis();
 renderTrainingPlan();
