@@ -127,6 +127,45 @@ html, body {
 }
 .cal-day.today-marker { border: 2px solid #023E8A; border-radius: 50%; }
 .cal-day.run-bg { border-radius: 50%; color: white !important; font-weight: 800; }
+.cal-day.clickable { cursor: pointer; }
+.cal-day.clickable:active { opacity: 0.7; }
+
+/* 日付詳細ポップアップ */
+.day-popup-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+  z-index: 200; align-items: flex-end; justify-content: center;
+}
+.day-popup-overlay.open { display: flex; }
+.day-popup {
+  background: white; border-radius: 20px 20px 0 0; width: 100%; max-width: 480px;
+  padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
+  max-height: 70vh; overflow-y: auto;
+}
+.day-popup-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;
+}
+.day-popup-date { font-weight: 800; font-size: 1.05em; color: #023E8A; }
+.day-popup-close {
+  background: #f0f2f5; border: none; border-radius: 50%; width: 30px; height: 30px;
+  font-size: 1em; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.day-popup-run {
+  padding: 12px 0; border-bottom: 1px solid #f5f5f5;
+}
+.day-popup-run:last-child { border-bottom: none; }
+.day-popup-run-top { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.day-popup-km { font-weight: 800; font-size: 1.1em; }
+.day-popup-badge {
+  font-size: 0.72em; padding: 2px 8px; border-radius: 10px; background: #EBF5FB; color: #1565C0;
+}
+.day-popup-badge.long { background: #FDF3E3; color: #E65100; }
+.day-popup-badge.other { background: #F0FFF4; color: #2E7D32; }
+.day-popup-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.day-popup-tag {
+  font-size: 0.78em; background: #f5f7fa; color: #555; padding: 3px 9px; border-radius: 10px;
+}
+.day-popup-note { font-size: 0.8em; color: #888; margin-top: 5px; }
+.day-popup-empty { text-align: center; color: #aaa; padding: 20px 0; font-size: 0.9em; }
 
 .card {
   background: white; border-radius: 14px; padding: 18px;
@@ -421,6 +460,17 @@ html, body {
   <!-- FABボタン -->
   <button class="fab" onclick="openModal()" title="ランを記録する">＋</button>
 
+</div>
+
+<!-- 日付詳細ポップアップ -->
+<div class="day-popup-overlay" id="dayPopupOverlay" onclick="closeDayPopup(event)">
+  <div class="day-popup" id="dayPopup">
+    <div class="day-popup-header">
+      <div class="day-popup-date" id="dayPopupDate"></div>
+      <button class="day-popup-close" onclick="closeDayPopup()">✕</button>
+    </div>
+    <div id="dayPopupContent"></div>
+  </div>
 </div>
 
 <!-- Modal -->
@@ -1446,7 +1496,7 @@ function renderCalendar(year, month) {
 
     if (dayRuns.length > 0) {
       const color = TYPE_COLORS_CAL[dayRuns[0].type] || '#023E8A';
-      cells += `<div class="cal-day run-bg has-run ${dowCls}" style="background:${color}" title="${dayRuns.map(r=>r.km+'km').join(', ')}">${d}</div>`;
+      cells += `<div class="cal-day run-bg has-run clickable ${dowCls}" style="background:${color}" onclick="showDayDetail('${dateStr}')">${d}</div>`;
     } else {
       cells += `<div class="cal-day ${dowCls}${isToday?' today-marker':''}">${d}</div>`;
     }
@@ -1466,6 +1516,47 @@ function renderCalendar(year, month) {
     </div>
     <div class="cal-grid">${cells}</div>
   `;
+}
+
+function showDayDetail(dateStr) {
+  const runs = getRuns().filter(r => r.date === dateStr);
+  const d = new Date(dateStr + 'T00:00:00');
+  const label = `${d.getMonth()+1}月${d.getDate()}日（${'日月火水木金土'[d.getDay()]}）`;
+  document.getElementById('dayPopupDate').textContent = label;
+
+  const TYPE_LABELS = { commute:'通勤ラン', outdoor:'屋外ラン', indoor:'屋内ラン' };
+  const BADGE_CLS   = { commute:'', outdoor:'other', indoor:'long' };
+  const TYPE_ICON   = { commute:'🏃', outdoor:'🌿', indoor:'🏋️' };
+
+  if (!runs.length) {
+    document.getElementById('dayPopupContent').innerHTML =
+      `<div class="day-popup-empty">この日の記録はありません</div>`;
+  } else {
+    document.getElementById('dayPopupContent').innerHTML = runs.map(r => {
+      const tags = [
+        r.min  ? `⏱ ${fmtMin(r.min)}` : '',
+        r.km   ? `📍 ${r.km.toFixed(1)} km` : '',
+        (r.min && r.km) ? `🏃 ${fmtPace(r.km, r.min)}/km` : '',
+        r.hr   ? `❤️ ${r.hr}拍` : '',
+        r.rpe  ? `💪 強度${r.rpe}` : '',
+      ].filter(Boolean);
+      return `<div class="day-popup-run">
+        <div class="day-popup-run-top">
+          <span style="font-size:1.3em">${TYPE_ICON[r.type]||'🏃'}</span>
+          <span class="day-popup-km">${r.km.toFixed(1)} km</span>
+          <span class="day-popup-badge ${BADGE_CLS[r.type]||''}">${TYPE_LABELS[r.type]||r.type}</span>
+        </div>
+        ${tags.length ? `<div class="day-popup-tags">${tags.map(t=>`<span class="day-popup-tag">${t}</span>`).join('')}</div>` : ''}
+        ${r.note ? `<div class="day-popup-note">📝 ${r.note}</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('dayPopupOverlay').classList.add('open');
+}
+
+function closeDayPopup(e) {
+  if (e && e.target !== document.getElementById('dayPopupOverlay')) return;
+  document.getElementById('dayPopupOverlay').classList.remove('open');
 }
 
 function refreshAll() {
