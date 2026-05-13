@@ -527,6 +527,12 @@ const setMS   = v => localStorage.setItem('ms_kobe26',   JSON.stringify(v));
 function today() { return new Date(new Date().toLocaleDateString('sv')); }
 function toDate(s) { return new Date(s + 'T00:00:00'); }
 function fmtDate(s) { const d = toDate(s); return `${d.getMonth()+1}/${d.getDate()}`; }
+function fmtMin(min) {
+  if (!min) return '';
+  const m = Math.floor(min);
+  const s = Math.round((min - m) * 60);
+  return s > 0 ? `${m}分${s}秒` : `${m}分`;
+}
 function fmtPace(km, min) {
   const p = min / km;
   const m = Math.floor(p), s = Math.round((p-m)*60);
@@ -692,7 +698,7 @@ function render() {
       return `<div class="run-item">
         <div class="run-icon">${icon}</div>
         <div class="run-main">
-          <div class="run-dist">${r.km.toFixed(1)} km　<span style="font-size:0.8em;font-weight:400;color:#888">${fmtDate(r.date)} · ${r.min ? r.min+'分' : ''}${note}</span></div>
+          <div class="run-dist">${r.km.toFixed(1)} km　<span style="font-size:0.8em;font-weight:400;color:#888">${fmtDate(r.date)} · ${fmtMin(r.min)}${note}</span></div>
           ${extras.length ? `<div class="run-extras">${extras.map(e=>`<span class="run-extra-tag">${e}</span>`).join('')}</div>` : ''}
         </div>
         <span class="run-badge ${badgeClass}">${badgeText}</span>
