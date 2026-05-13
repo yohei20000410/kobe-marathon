@@ -486,59 +486,87 @@ function revertPhase() {
   if (cur > 0 && confirm('前のフェーズに戻しますか？')) { savePhaseIdx(cur - 1); refreshAll(); }
 }
 
+let viewingPhaseIdx = null; // null = show current
+
 function renderPhaseCard() {
-  const phaseIdx = getPhaseIdx();
-  const p = PHASES[phaseIdx];
-  const prog = getPhaseRunProgress(phaseIdx);
-  const isLast = phaseIdx >= PHASES.length - 1;
-  const nextP = !isLast ? PHASES[phaseIdx + 1] : null;
+  const curIdx = getPhaseIdx();
+  const viewIdx = viewingPhaseIdx !== null ? viewingPhaseIdx : curIdx;
+  const p = PHASES[viewIdx];
+  const prog = getPhaseRunProgress(viewIdx);
+  const isLast = curIdx >= PHASES.length - 1;
+  const nextP = !isLast ? PHASES[curIdx + 1] : null;
+  const isViewingCurrent = viewIdx === curIdx;
+
+  const shortNames = ['Ph1','Ph2','Ph3','Ph4','BUF','TAP'];
+  const dates = ['5/11','6/16','8/4','9/22','10/20','11/9'];
 
   // Timeline
   const tlHTML = PHASES.map((ph, i) => {
-    const state = i < phaseIdx ? 'done' : i === phaseIdx ? 'active' : 'future';
-    const shortNames = ['Ph1','Ph2','Ph3','Ph4','BUF','TAP'];
-    const dates = ['5/11','6/16','8/4','9/22','10/20','11/9'];
-    const dotStyle = state === 'active' ? `background:${ph.color};border-color:${ph.color};color:white` : '';
+    const state = i < curIdx ? 'done' : i === curIdx ? 'active' : 'future';
+    const isViewing = i === viewIdx;
+    const dotStyle = state === 'active'
+      ? `background:${ph.color};border-color:${ph.color};color:white`
+      : isViewing ? `border-color:${ph.color};color:${ph.color}` : '';
     const check = state === 'done' ? '✓' : (i + 1).toString();
-    return `<div class="pt-item ${state}">
-      <div class="pt-dot" style="${dotStyle}">${check}</div>
-      <div class="pt-label" style="${state==='active'?`color:${ph.color}`:''}">${shortNames[i]}</div>
+    const ringStyle = isViewing && state !== 'active' ? `outline:2px solid ${ph.color};outline-offset:2px;border-radius:50%` : '';
+    return `<div class="pt-item ${state}" onclick="viewPhase(${i})" style="cursor:pointer">
+      <div class="pt-dot" style="${dotStyle};${ringStyle}">${check}</div>
+      <div class="pt-label" style="${isViewing?`color:${ph.color};font-weight:800`:''}">${shortNames[i]}</div>
       <div class="pt-date">${dates[i]}</div>
     </div>`;
   }).join('');
 
-  // Current phase block
+  // Detail block
   const progBarColor = prog.pct >= 100 ? '#4CAF50' : p.color;
-  const readyToAdvance = prog.pct >= 80 && !isLast;
-  const nextBtnText = isLast ? '最終フェーズです 🏅' : `次へ：${nextP.name}（${nextP.sub}）→`;
+  const statusTag = !isViewingCurrent
+    ? (viewIdx < curIdx
+        ? `<span style="font-size:0.72em;background:#E8F5E9;color:#2E7D32;padding:2px 8px;border-radius:8px;margin-left:6px">✓ 完了</span>`
+        : `<span style="font-size:0.72em;background:#f0f2f5;color:#999;padding:2px 8px;border-radius:8px;margin-left:6px">予定</span>`)
+    : `<span style="font-size:0.72em;background:${p.color}22;color:${p.color};padding:2px 8px;border-radius:8px;margin-left:6px;font-weight:700">現在</span>`;
+
+  const progSection = isViewingCurrent ? `
+    <div class="phase-prog-wrap">
+      <div class="phase-prog-label">
+        <span>フェーズ進捗</span>
+        <span class="phase-prog-val">${prog.pct}%　${prog.label}</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" style="width:${prog.pct}%;background:${progBarColor}"></div>
+      </div>
+      ${prog.pct >= 100
+        ? `<div class="phase-prog-note" style="color:#4CAF50;font-weight:700">✅ 目標達成！次のフェーズへ進めます</div>`
+        : prog.pct >= 80
+          ? `<div class="phase-prog-note" style="color:${p.color}">🔥 もうすぐ目標達成！</div>`
+          : `<div class="phase-prog-note">進捗は最長走行距離から自動計算</div>`}
+    </div>` : '';
+
+  const actionBtns = isViewingCurrent ? `
+    <button class="btn-next-phase" onclick="advancePhase()" ${isLast?'disabled':''}>${isLast ? '最終フェーズです 🏅' : `次へ：${nextP.name}（${nextP.sub}）→`}</button>
+    ${curIdx > 0 ? `<button class="btn-prev-phase" onclick="revertPhase()">← 前のフェーズに戻す</button>` : ''}
+  ` : `<button class="btn-prev-phase" onclick="viewPhase(${curIdx})">← 現在のフェーズに戻る</button>`;
 
   document.getElementById('phaseCard').innerHTML = `
     <div class="phase-timeline">${tlHTML}</div>
-    <div class="phase-current" style="background:${p.color}18; border-left: 3px solid ${p.color}">
+    <div class="phase-current" style="background:${p.color}18;border-left:3px solid ${p.color}">
       <div class="phase-current-top">
         <div class="phase-dot" style="background:${p.color}"></div>
-        <div>
-          <div class="phase-name">${p.name}：${p.sub}</div>
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px">
+          <div class="phase-name">${p.name}：${p.sub}</div>${statusTag}
         </div>
       </div>
       <div class="phase-goal">${p.goal}</div>
       <div class="phase-deadline">目安期間：<strong>${p.start.slice(5).replace('-','/')} 〜 ${p.end.slice(5).replace('-','/')}</strong></div>
-      <div class="phase-prog-wrap">
-        <div class="phase-prog-label">
-          <span>フェーズ進捗</span>
-          <span class="phase-prog-val">${prog.pct}%　${prog.label}</span>
-        </div>
-        <div class="progress-bar">
-          <div class="progress-fill" style="width:${prog.pct}%; background:${progBarColor}"></div>
-        </div>
-        ${prog.pct >= 100 ? `<div class="phase-prog-note" style="color:#4CAF50; font-weight:700">✅ 目標達成！次のフェーズへ進めます</div>`
-          : prog.pct >= 80 ? `<div class="phase-prog-note" style="color:${p.color}">🔥 もうすぐ目標達成！</div>`
-          : `<div class="phase-prog-note">進捗は最長走行距離から自動計算</div>`}
-      </div>
+      ${progSection}
     </div>
-    <button class="btn-next-phase" onclick="advancePhase()" ${isLast ? 'disabled' : ''}>${nextBtnText}</button>
-    ${phaseIdx > 0 ? `<button class="btn-prev-phase" onclick="revertPhase()">← 前のフェーズに戻す</button>` : ''}
+    ${actionBtns}
   `;
+}
+
+function viewPhase(idx) {
+  viewingPhaseIdx = (idx === getPhaseIdx() && viewingPhaseIdx === null) ? null : idx;
+  if (idx === getPhaseIdx()) viewingPhaseIdx = null;
+  else viewingPhaseIdx = idx;
+  renderPhaseCard();
 }
 
 // Render
