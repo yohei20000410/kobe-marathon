@@ -445,8 +445,8 @@ html, body {
     </div>
     <div class="row2">
       <div class="fg">
-        <label>タイム（分）</label>
-        <input type="number" id="fMin" placeholder="例: 65" min="1" oninput="onDistChange()">
+        <label>タイム（分.秒）</label>
+        <input type="text" id="fMin" placeholder="例: 65.30 → 65分30秒" oninput="onDistChange()">
       </div>
       <div class="fg">
         <label>&nbsp;</label>
@@ -756,9 +756,28 @@ function onTypeChange() {
   if (t !== 'indoor' && noteEl.value === 'トレッドミル') noteEl.value = '';
   onDistChange();
 }
+// タイム入力パーサー：小数点以下を秒として解釈
+// 例: 65.30 → 65分30秒 = 65.5分、5.5 → 5分5秒 = 5.0833分
+function parseMinInput(val) {
+  const str = String(val || '').trim();
+  if (!str) return null;
+  if (str.includes(':')) {
+    // MM:SS 形式にも対応
+    const [m, s] = str.split(':').map(Number);
+    return m + (s || 0) / 60;
+  }
+  if (str.includes('.')) {
+    const [mPart, sPart] = str.split('.');
+    const m = parseInt(mPart) || 0;
+    const s = parseInt(sPart) || 0;
+    return m + s / 60;
+  }
+  return parseFloat(str) || null;
+}
+
 function onDistChange() {
   const km = parseFloat(document.getElementById('fDist').value);
-  const min = parseFloat(document.getElementById('fMin').value);
+  const min = parseMinInput(document.getElementById('fMin').value);
   const hint = document.getElementById('paceHint');
   if (km > 0 && min > 0) {
     hint.textContent = 'ペース：' + fmtPace(km, min) + '/km';
@@ -772,7 +791,7 @@ function onDistChange() {
 function saveRun() {
   const date = document.getElementById('fDate').value;
   const type = document.getElementById('fType').value;
-  const min  = parseFloat(document.getElementById('fMin').value) || null;
+  const min  = parseMinInput(document.getElementById('fMin').value);
   const note = document.getElementById('fNote').value.trim();
   const km   = parseFloat(document.getElementById('fDist').value);
 
