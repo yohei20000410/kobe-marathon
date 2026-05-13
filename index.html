@@ -1470,6 +1470,46 @@ renderPaceAnalysis();
 renderTrainingPlan();
 initSetup();
 
+// ショートカットからのURLパラメーター自動入力
+// 例: ?import=1&date=2026-05-14&km=5.32&sec=2213&hr=145&rpe=7&type=outdoor
+function checkURLImport() {
+  const p = new URLSearchParams(location.search);
+  if (p.get('import') !== '1') return;
+
+  const date = p.get('date') || new Date().toLocaleDateString('sv');
+  const km   = parseFloat(p.get('km'));
+  const sec  = parseInt(p.get('sec'));   // 秒数 → 内部では分に変換
+  const hr   = parseInt(p.get('hr')) || null;
+  const rpe  = parseInt(p.get('rpe')) || null;
+  const type = p.get('type') || 'outdoor';
+
+  if (!km || !sec) return;
+
+  const minFloat = sec / 60; // 例: 2213秒 → 36.883...分
+
+  // モーダルに値をセット
+  editingIdx = null;
+  document.getElementById('modalTitle').textContent = 'ランを記録（Watch連携）';
+  document.getElementById('btnSave').textContent = '保存する';
+  document.getElementById('fDate').value = date;
+  document.getElementById('fType').value = type;
+  document.getElementById('fDist').value = km.toFixed(2);
+  // 分.秒 形式で表示
+  const m = Math.floor(minFloat);
+  const s = Math.round((minFloat - m) * 60);
+  document.getElementById('fMin').value = s > 0 ? `${m}.${String(s).padStart(2,'0')}` : `${m}`;
+  if (hr) document.getElementById('fHR').value = hr;
+  if (rpe) { selectRPE(rpe); }
+  document.getElementById('fNote').value = '';
+  onTypeChange();
+  onDistChange();
+  document.getElementById('overlay').classList.add('open');
+
+  // URLをクリーン（リロード時の再入力防止）
+  history.replaceState({}, '', location.pathname);
+}
+checkURLImport();
+
 // Service Worker 登録（オフライン対応）
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
