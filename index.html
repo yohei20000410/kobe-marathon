@@ -1480,17 +1480,20 @@ function renderTrainingPlan() {
 
 function getWeeklyMenu(phaseIdx, weeksLeft, a, goalPace) {
   const gapSec = a.status === 'ok' ? Math.round((a.estMarathonPace - goalPace) * 60) : 999;
-  const currentPace = a.status === 'ok' ? a.estMarathonPace : null;
 
   // Helper: format pace range string
-  const pr = (lo, hi) => `${paceToStr(lo)}〜${paceToStr(hi)}/km`;
+  const pr = (lo, hi) => `${paceToStr(Math.max(lo, 3.0))}〜${paceToStr(Math.max(hi, 3.5))}/km`;
 
-  // Pace ranges based on current ability
-  const mp = currentPace || 6.5;
-  const indoorPace  = pr(mp - 0.60, mp - 0.15);
-  const commutePace = pr(mp - 0.40, mp - 0.05);
-  const longPace    = pr(mp - 0.20, mp + 0.15);
-  const easyPace    = longPace;
+  // ── フェーズごとの強度オフセット（goalPaceからの差、分/km）──
+  // 数値が大きいほど目標ペースより遅め（楽）
+  // 後半フェーズほど目標ペースに近づく
+  const intensityOffset = [1.0, 0.7, 0.45, 0.2, 0.15, 0.6][phaseIdx] ?? 0.5;
+  const base = goalPace + intensityOffset; // フェーズ×目標に応じた基準ペース
+
+  const indoorPace  = pr(base - 0.45, base + 0.10); // 屋内：基準より少し速め（テンポ寄り）
+  const commutePace = pr(base + 0.10, base + 0.55); // 通勤：基準より少し遅め（回復寄り）
+  const longPace    = pr(base + 0.00, base + 0.40); // ロング：基準付近（有酸素）
+  const easyPace    = pr(base + 0.30, base + 0.80); // 楽ジョグ（テーパー等）
 
   if (phaseIdx === 5 || weeksLeft <= 2) {
     // Taper
