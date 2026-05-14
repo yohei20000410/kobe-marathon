@@ -1484,16 +1484,18 @@ function getWeeklyMenu(phaseIdx, weeksLeft, a, goalPace) {
   // Helper: format pace range string
   const pr = (lo, hi) => `${paceToStr(Math.max(lo, 3.0))}〜${paceToStr(Math.max(hi, 3.5))}/km`;
 
-  // ── フェーズごとの強度オフセット（goalPaceからの差、分/km）──
-  // 数値が大きいほど目標ペースより遅め（楽）
-  // 後半フェーズほど目標ペースに近づく
-  const intensityOffset = [1.0, 0.7, 0.45, 0.2, 0.15, 0.6][phaseIdx] ?? 0.5;
-  const base = goalPace + intensityOffset; // フェーズ×目標に応じた基準ペース
+  // ── フェーズ×種別ごとのペースオフセット表（goalPaceからの差、分/km）──
+  // マイナス = 目標ペースより速い（追い込む）、プラス = 遅い（楽）
+  //                        Ph1        Ph2        Ph3        Ph4       BUF       TAP
+  const INDOOR_OFF  = [[0.6,1.1], [0.3,0.8], [0.0,0.5], [-0.3,0.2], [-0.2,0.3], [0.5,1.0]];
+  const COMMUTE_OFF = [[1.0,1.5], [0.8,1.3], [0.6,1.1], [ 0.4,0.9], [ 0.5,1.0], [0.8,1.3]];
+  const LONG_OFF    = [[0.5,1.0], [0.4,0.9], [0.3,0.8], [ 0.1,0.5], [ 0.3,0.7], [0.5,1.0]];
 
-  const indoorPace  = pr(base - 0.45, base + 0.10); // 屋内：基準より少し速め（テンポ寄り）
-  const commutePace = pr(base + 0.10, base + 0.55); // 通勤：基準より少し遅め（回復寄り）
-  const longPace    = pr(base + 0.00, base + 0.40); // ロング：基準付近（有酸素）
-  const easyPace    = pr(base + 0.30, base + 0.80); // 楽ジョグ（テーパー等）
+  const idx = Math.min(phaseIdx, 5);
+  const indoorPace  = pr(goalPace + INDOOR_OFF[idx][0],  goalPace + INDOOR_OFF[idx][1]);
+  const commutePace = pr(goalPace + COMMUTE_OFF[idx][0], goalPace + COMMUTE_OFF[idx][1]);
+  const longPace    = pr(goalPace + LONG_OFF[idx][0],    goalPace + LONG_OFF[idx][1]);
+  const easyPace    = pr(goalPace + 0.8, goalPace + 1.3); // テーパー用ゆっくりジョグ
 
   if (phaseIdx === 5 || weeksLeft <= 2) {
     // Taper
