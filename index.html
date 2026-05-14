@@ -1583,13 +1583,27 @@ function renderLottery() {
   if (!lotteryStr) { el.innerHTML = ''; return; }
   const now = today();
   const diff = Math.ceil((toDate(lotteryStr) - now) / 86400000);
-  if (diff <= 0) { el.innerHTML = ''; return; }
-  el.innerHTML = `
-    <div class="lottery-divider"></div>
-    <div class="lottery-row">
-      <span class="lottery-label">🎫 当選発表まで</span>
-      <span class="lottery-days">${diff}日</span>
-    </div>`;
+  if (diff > 0) {
+    // 発表前：カウントダウン
+    el.innerHTML = `
+      <div class="lottery-divider"></div>
+      <div class="lottery-row">
+        <span class="lottery-label">🎫 当選発表まで</span>
+        <span class="lottery-days">${diff}日</span>
+      </div>`;
+  } else if (diff >= -7) {
+    // 発表後7日以内：確認を促す
+    const passed = -diff;
+    const msg = passed === 0 ? '本日発表！' : `発表から${passed}日`;
+    el.innerHTML = `
+      <div class="lottery-divider"></div>
+      <div class="lottery-row">
+        <span class="lottery-label">🎫 当選確認はお済みですか？</span>
+        <span class="lottery-days" style="font-size:0.85em">${msg}</span>
+      </div>`;
+  } else {
+    el.innerHTML = '';
+  }
 }
 
 // ── Calendar ─────────────────────────────────────────────────
