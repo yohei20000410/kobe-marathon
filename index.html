@@ -370,6 +370,9 @@ html, body {
 .pa-empty { text-align: center; padding: 18px 0 6px; }
 .pa-empty-num { font-size: 2em; font-weight: 800; color: #e0e0e0; }
 .pa-empty-msg { font-size: 0.82em; color: #bbb; margin-top: 4px; line-height: 1.5; }
+.race-chip { padding:7px 14px; border-radius:20px; font-size:0.85em; font-weight:600; border:2px solid #ddd; background:white; color:#666; cursor:pointer; transition:all 0.15s; }
+.race-chip.active { background:#023E8A; color:white; border-color:#023E8A; }
+.race-chip.past { background:#f5f5f5; color:#999; border-color:#ddd; }
 </style>
 </head>
 <body>
@@ -472,6 +475,13 @@ html, body {
       <div class="day-popup-date">⚙️ 大会設定</div>
       <button class="day-popup-close" onclick="closeSettings()">✕</button>
     </div>
+    <!-- 大会選択エリア -->
+    <div id="raceListArea" style="margin-bottom:16px">
+      <div style="font-size:0.8em;color:#888;margin-bottom:8px">大会を選択</div>
+      <div id="raceChips" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px"></div>
+      <button onclick="addNewRace()" style="width:100%;padding:11px;background:#f0f4ff;color:#023E8A;border:1px dashed #023E8A;border-radius:10px;font-size:0.9em;font-weight:600">＋ 新しい大会を追加</button>
+    </div>
+    <div style="border-top:1px solid #f0f2f5;margin-bottom:16px"></div>
     <div class="fg" style="margin-bottom:12px">
       <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">大会名</label>
       <input type="text" id="sCfgName" placeholder="例: 神戸マラソン 2026" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
@@ -502,6 +512,11 @@ html, body {
     <div class="fg" style="margin-bottom:20px">
       <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">トレーニング開始日</label>
       <input type="date" id="sCfgStart" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
+    </div>
+    <div class="fg" style="margin-bottom:16px" id="raceResultWrap">
+      <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">🏅 本番タイム（大会終了後に記録）</label>
+      <input type="text" id="sCfgResult" placeholder="例: 4:15:30" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
+      <input type="text" id="sCfgResultNote" placeholder="一言コメント（任意）" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em;margin-top:6px">
     </div>
     <button onclick="saveSettings()" style="width:100%;padding:14px;background:#023E8A;color:white;border:none;border-radius:12px;font-size:1em;font-weight:700">保存する</button>
   </div>
@@ -593,12 +608,24 @@ html, body {
 const STATION_KM = 1.3;
 
 // ── 設定管理 ──────────────────────────────────
-const RACE_CFG_KEY = 'race_cfg';
+const RACE_CFG_KEY = 'race_cfg'; // 旧キー（後方互換のため保持）
 const RACE_CFG_DEFAULT = { name:'神戸マラソン 2026', date:'2026-11-22', goalMin:240, startDate:'2026-05-11', lotteryDate:'2026-07-01' };
+
+// ── 複数大会管理 ──────────────────────────────
+const getActiveRaceId = () => localStorage.getItem('active_race_id') || 'kobe26';
+const getRaceList = () => JSON.parse(localStorage.getItem('race_list') || '[]');
+const setRaceList = v => localStorage.setItem('race_list', JSON.stringify(v));
+
 function getRaceCfg() {
-  return { ...RACE_CFG_DEFAULT, ...JSON.parse(localStorage.getItem(RACE_CFG_KEY) || '{}') };
+  const id = getActiveRaceId();
+  return { ...RACE_CFG_DEFAULT, ...JSON.parse(localStorage.getItem(`race_cfg_${id}`) || '{}') };
 }
-function setRaceCfg(v) { localStorage.setItem(RACE_CFG_KEY, JSON.stringify(v)); }
+function setRaceCfg(v) {
+  localStorage.setItem(`race_cfg_${getActiveRaceId()}`, JSON.stringify(v));
+}
+
+const getRaceResult = () => JSON.parse(localStorage.getItem(`race_result_${getActiveRaceId()}`) || 'null');
+const setRaceResult = v => localStorage.setItem(`race_result_${getActiveRaceId()}`, JSON.stringify(v));
 
 // ── フェーズ自動計算 ──────────────────────────
 function addDaysStr(dateStr, n) {
@@ -720,10 +747,10 @@ const MILESTONES = [
 ];
 
 // Storage
-const getRuns = () => JSON.parse(localStorage.getItem('runs_kobe26') || '[]');
-const setRuns = v => localStorage.setItem('runs_kobe26', JSON.stringify(v));
-const getMS   = () => JSON.parse(localStorage.getItem('ms_kobe26')   || '{}');
-const setMS   = v => localStorage.setItem('ms_kobe26',   JSON.stringify(v));
+const getRuns = () => JSON.parse(localStorage.getItem(`runs_${getActiveRaceId()}`) || '[]');
+const setRuns = v => localStorage.setItem(`runs_${getActiveRaceId()}`, JSON.stringify(v));
+const getMS   = () => JSON.parse(localStorage.getItem(`ms_${getActiveRaceId()}`)   || '{}');
+const setMS   = v => localStorage.setItem(`ms_${getActiveRaceId()}`,   JSON.stringify(v));
 
 // Helpers
 function today() { return new Date(new Date().toLocaleDateString('sv')); }
@@ -744,7 +771,7 @@ function stationsToKm(v) { return v === 'full' ? 17 : parseInt(v) * STATION_KM; 
 
 // Phase (manual override)
 const getPhaseIdx = () => {
-  const stored = localStorage.getItem('phaseIdx_kobe26');
+  const stored = localStorage.getItem(`phaseIdx_${getActiveRaceId()}`);
   if (stored !== null) return parseInt(stored);
   // Default: date-based
   const t = today();
@@ -753,7 +780,7 @@ const getPhaseIdx = () => {
   }
   return PHASES.length - 1;
 };
-const savePhaseIdx = v => localStorage.setItem('phaseIdx_kobe26', v);
+const savePhaseIdx = v => localStorage.setItem(`phaseIdx_${getActiveRaceId()}`, v);
 function getPhase() { return PHASES[getPhaseIdx()]; }
 
 // Phase progress based on actual runs
@@ -1715,7 +1742,19 @@ function closeDayPopup(e) {
 }
 
 // ── 設定シート ───────────────────────────────────────────────
+function renderRaceChips() {
+  const list = getRaceList();
+  const activeId = getActiveRaceId();
+  document.getElementById('raceChips').innerHTML = list.map(r => {
+    const isPast = r.date && new Date(r.date + 'T00:00:00') < today();
+    const cls = r.id === activeId ? 'active' : isPast ? 'past' : '';
+    const label = isPast ? r.name + ' ✓' : r.name;
+    return `<button class="race-chip ${cls}" onclick="switchRace('${r.id}')">${label}</button>`;
+  }).join('');
+}
+
 function openSettings() {
+  renderRaceChips();
   const cfg = getRaceCfg();
   document.getElementById('sCfgName').value = cfg.name;
   document.getElementById('sCfgDate').value = cfg.date;
@@ -1730,6 +1769,9 @@ function openSettings() {
     document.getElementById('sCfgGoalMin').value = cfg.goalMin;
     document.getElementById('sCfgCustomWrap').style.display = 'block';
   }
+  const result = getRaceResult();
+  document.getElementById('sCfgResult').value = result ? result.finishTime || '' : '';
+  document.getElementById('sCfgResultNote').value = result ? result.note || '' : '';
   document.getElementById('settingsOverlay').classList.add('open');
 }
 function closeSettings(e) {
@@ -1751,9 +1793,81 @@ function saveSettings() {
   const lotteryDate = document.getElementById('sCfgLottery').value || '';
   setRaceCfg({ name, date, goalMin, startDate: start, lotteryDate });
   applyRaceCfg();
-  localStorage.removeItem('phaseIdx_kobe26'); // フェーズをリセット
+  localStorage.removeItem(`phaseIdx_${getActiveRaceId()}`); // フェーズをリセット
+  // 本番記録の保存
+  const resultTime = document.getElementById('sCfgResult').value.trim();
+  const resultNote = document.getElementById('sCfgResultNote').value.trim();
+  if (resultTime) {
+    setRaceResult({ finishTime: resultTime, note: resultNote });
+  } else {
+    localStorage.removeItem(`race_result_${getActiveRaceId()}`);
+  }
+  // race_listのnameとdateも更新
+  const list = getRaceList();
+  const idx = list.findIndex(r => r.id === getActiveRaceId());
+  if (idx >= 0) { list[idx].name = name; list[idx].date = date; setRaceList(list); }
   closeSettings();
   refreshAll();
+}
+
+function switchRace(id) {
+  localStorage.setItem('active_race_id', id);
+  applyRaceCfg();
+  localStorage.removeItem(`phaseIdx_${id}`); // 日付ベースで再計算
+  renderRaceChips();
+  // 設定フィールドを新しい大会の設定で再描画
+  const cfg = getRaceCfg();
+  document.getElementById('sCfgName').value = cfg.name;
+  document.getElementById('sCfgDate').value = cfg.date;
+  document.getElementById('sCfgLottery').value = cfg.lotteryDate || '';
+  document.getElementById('sCfgStart').value = cfg.startDate;
+  const preset = [210,240,270,300];
+  if (preset.includes(cfg.goalMin)) {
+    document.getElementById('sCfgGoalSel').value = String(cfg.goalMin);
+    document.getElementById('sCfgCustomWrap').style.display = 'none';
+  } else {
+    document.getElementById('sCfgGoalSel').value = '0';
+    document.getElementById('sCfgGoalMin').value = cfg.goalMin;
+    document.getElementById('sCfgCustomWrap').style.display = 'block';
+  }
+  const result = getRaceResult();
+  document.getElementById('sCfgResult').value = result ? result.finishTime || '' : '';
+  document.getElementById('sCfgResultNote').value = result ? result.note || '' : '';
+  refreshAll();
+}
+
+function addNewRace() {
+  const name = prompt('新しい大会名を入力してください', '〇〇マラソン 2027');
+  if (!name || !name.trim()) return;
+  const date = prompt('開催日を入力してください（例: 2027-03-15）', '2027-03-15');
+  if (!date) return;
+  // ユニークIDを生成
+  const id = 'race_' + Date.now();
+  const newCfg = { ...RACE_CFG_DEFAULT, name: name.trim(), date, startDate: new Date().toLocaleDateString('sv') };
+  localStorage.setItem(`race_cfg_${id}`, JSON.stringify(newCfg));
+  const list = getRaceList();
+  list.push({ id, name: name.trim(), date });
+  setRaceList(list);
+  switchRace(id);
+}
+
+// ── 旧データ移行 ──────────────────────────────
+function migrateToMultiRace() {
+  if (localStorage.getItem('race_list')) return;
+  const id = 'kobe26';
+  // 旧データを新キーにコピー
+  const oldRuns = localStorage.getItem('runs_kobe26');
+  if (oldRuns) localStorage.setItem(`runs_${id}`, oldRuns);
+  const oldMs = localStorage.getItem('ms_kobe26');
+  if (oldMs) localStorage.setItem(`ms_${id}`, oldMs);
+  const oldCfg = localStorage.getItem('race_cfg');
+  const cfg = oldCfg ? JSON.parse(oldCfg) : RACE_CFG_DEFAULT;
+  localStorage.setItem(`race_cfg_${id}`, JSON.stringify(cfg));
+  const oldPhase = localStorage.getItem('phaseIdx_kobe26');
+  if (oldPhase) localStorage.setItem(`phaseIdx_${id}`, oldPhase);
+  // race_listを初期化
+  localStorage.setItem('race_list', JSON.stringify([{id, name: cfg.name || '神戸マラソン 2026', date: cfg.date || '2026-11-22'}]));
+  localStorage.setItem('active_race_id', id);
 }
 
 function refreshAll() {
@@ -1766,6 +1880,7 @@ function refreshAll() {
   renderTrainingPlan();
 }
 
+migrateToMultiRace(); // 旧データ移行（初回のみ）
 applyRaceCfg();
 render();
 renderLottery();
