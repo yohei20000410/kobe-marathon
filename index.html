@@ -699,7 +699,7 @@ function applyRaceCfg() {
   RACE_DATE     = toDate(cfg.date);
   PHASES        = computePhases(cfg.startDate, cfg.date, cfg.goalMin);
   // ゴール
-  localStorage.setItem('goal_kobe26', cfg.goalMin);
+  localStorage.setItem(`goal_${getActiveRaceId()}`, cfg.goalMin);
   // ヘッダー更新
   const raceD = toDate(cfg.date);
   document.getElementById('headerRaceName').textContent = '🏃 ' + cfg.name;
@@ -1424,8 +1424,8 @@ function importData() {
 }
 
 // ── Training Plan ────────────────────────────────────────────
-const getGoal = () => parseInt(localStorage.getItem('goal_kobe26') || '240');
-const setGoalMin = v => { localStorage.setItem('goal_kobe26', v); renderTrainingPlan(); };
+const getGoal = () => parseInt(localStorage.getItem(`goal_${getActiveRaceId()}`) || String(getRaceCfg().goalMin));
+const setGoalMin = v => { localStorage.setItem(`goal_${getActiveRaceId()}`, v); renderTrainingPlan(); };
 
 function selectGoal(min) {
   setGoalMin(min);
