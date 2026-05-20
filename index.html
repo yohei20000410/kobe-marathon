@@ -558,7 +558,7 @@ html, body {
     <div class="row2">
       <div class="fg">
         <label>タイム（分.秒）</label>
-        <input type="text" id="fMin" placeholder="例: 65.30 → 65分30秒" oninput="onDistChange()">
+        <input type="text" id="fMin" placeholder="例: 65.30 / 1.13.20（1時間13分20秒）" oninput="onDistChange()">
       </div>
       <div class="fg">
         <label>&nbsp;</label>
@@ -758,8 +758,11 @@ function toDate(s) { return new Date(s + 'T00:00:00'); }
 function fmtDate(s) { const d = toDate(s); return `${d.getMonth()+1}/${d.getDate()}`; }
 function fmtMin(min) {
   if (!min) return '';
-  const m = Math.floor(min);
-  const s = Math.round((min - m) * 60);
+  const totalSec = Math.round(min * 60);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) return s > 0 ? `${h}時間${m}分${s}秒` : `${h}時間${m}分`;
   return s > 0 ? `${m}分${s}秒` : `${m}分`;
 }
 function fmtPace(km, min) {
@@ -997,9 +1000,17 @@ function editRun(idx) {
   document.getElementById('fDist').value = r.km || '';
   // タイム：分+秒を "分.秒" 形式で表示
   if (r.min) {
-    const m = Math.floor(r.min);
-    const s = Math.round((r.min - m) * 60);
-    document.getElementById('fMin').value = s > 0 ? `${m}.${String(s).padStart(2,'0')}` : `${m}`;
+    const totalSec = Math.round(r.min * 60);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    if (h > 0) {
+      document.getElementById('fMin').value = s > 0
+        ? `${h}.${String(m).padStart(2,'0')}.${String(s).padStart(2,'0')}`
+        : `${h}.${String(m).padStart(2,'0')}.00`;
+    } else {
+      document.getElementById('fMin').value = s > 0 ? `${m}.${String(s).padStart(2,'0')}` : `${m}`;
+    }
   } else {
     document.getElementById('fMin').value = '';
   }
@@ -1036,11 +1047,18 @@ function onTypeChange() {
 function parseMinInput(val) {
   const str = String(val || '').trim();
   if (!str) return null;
+  // H:MM:SS または M:SS 形式
   if (str.includes(':')) {
-    // MM:SS 形式にも対応
-    const [m, s] = str.split(':').map(Number);
-    return m + (s || 0) / 60;
+    const parts = str.split(':').map(Number);
+    if (parts.length === 3) return parts[0] * 60 + parts[1] + parts[2] / 60;
+    if (parts.length === 2) return parts[0] + (parts[1] || 0) / 60;
   }
+  // H.MM.SS 形式（例：1.13.20 → 1時間13分20秒）
+  if ((str.match(/\./g) || []).length === 2) {
+    const [h, m, s] = str.split('.').map(v => parseInt(v) || 0);
+    return h * 60 + m + s / 60;
+  }
+  // M.SS 形式（例：65.30 → 65分30秒）
   if (str.includes('.')) {
     const [mPart, sPart] = str.split('.');
     const m = parseInt(mPart) || 0;
