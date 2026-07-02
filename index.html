@@ -419,6 +419,7 @@ html, body {
   <!-- ホームタブ -->
   <div class="tab-content active" id="tab-home">
     <div class="container">
+      <div id="raceResultBanner"></div>
       <div class="card">
         <div class="card-title">トレーニングフェーズ</div>
         <div id="phaseCard"></div>
@@ -468,12 +469,26 @@ html, body {
         <div id="runList"></div>
       </div>
       <div class="card">
-        <div class="card-title">Apple Watch</div>
-        <button class="btn-watch" onclick="importFromWatch()" style="margin-top:0">⌚ Apple Watch から取り込む</button>
+        <div class="card-title">☁️ 端末間同期</div>
+        <div class="backup-note">GitHubトークンを設定すると、PC・スマホなど複数の端末で自動的にデータが同期されます。</div>
+        <div id="syncStatus" style="font-size:0.82em;color:#888;margin-bottom:10px">未設定</div>
+        <div id="syncTokenArea">
+          <input type="password" id="syncToken" placeholder="GitHubトークン（gist権限）" style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-size:0.85em;box-sizing:border-box">
+          <button class="btn-backup" style="width:100%;margin-top:8px" onclick="saveSyncToken()">🔗 同期を開始</button>
+          <div style="font-size:0.72em;color:#aaa;margin-top:6px;line-height:1.5">
+            トークンの作り方：GitHub → Settings → Developer settings → Personal access tokens → Generate new token（classic）で「gist」だけにチェック。同じトークンを他の端末にも入力すれば同期されます。
+          </div>
+        </div>
+        <div id="syncActiveArea" style="display:none">
+          <div class="backup-btns">
+            <button class="btn-backup" onclick="syncNow(true)">🔄 今すぐ同期</button>
+            <button class="btn-backup" onclick="disableSync()" style="color:#C62828">同期を解除</button>
+          </div>
+        </div>
       </div>
       <div class="card" style="margin-bottom:90px">
         <div class="card-title">データのバックアップ</div>
-        <div class="backup-note">アプリ更新後もデータは自動で引き継がれます。<br>念のためバックアップも可能です。</div>
+        <div class="backup-note">全大会の記録・設定・目標をまとめて書き出せます。<br>機種変更時はエクスポート→新端末でインポート。</div>
         <div class="backup-btns">
           <button class="btn-backup" onclick="exportData()">📤 エクスポート</button>
           <button class="btn-backup" onclick="showImport()">📥 インポート</button>
@@ -542,6 +557,7 @@ html, body {
       <input type="text" id="sCfgResultNote" placeholder="一言コメント（任意）" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em;margin-top:6px">
     </div>
     <button onclick="saveSettings()" style="width:100%;padding:14px;background:#023E8A;color:white;border:none;border-radius:12px;font-size:1em;font-weight:700">保存する</button>
+    <button onclick="deleteRace()" style="width:100%;padding:11px;background:none;color:#C62828;border:1px solid #ffcdd2;border-radius:12px;font-size:0.85em;font-weight:600;margin-top:10px">🗑 この大会と記録をすべて削除</button>
   </div>
 </div>
 
@@ -637,7 +653,7 @@ const RACE_CFG_DEFAULT = { name:'神戸マラソン 2026', date:'2026-11-22', go
 // ── 複数大会管理 ──────────────────────────────
 const getActiveRaceId = () => localStorage.getItem('active_race_id') || 'kobe26';
 const getRaceList = () => JSON.parse(localStorage.getItem('race_list') || '[]');
-const setRaceList = v => localStorage.setItem('race_list', JSON.stringify(v));
+const setRaceList = v => { localStorage.setItem('race_list', JSON.stringify(v)); markDirty(); };
 
 function getRaceCfg() {
   const id = getActiveRaceId();
@@ -645,10 +661,11 @@ function getRaceCfg() {
 }
 function setRaceCfg(v) {
   localStorage.setItem(`race_cfg_${getActiveRaceId()}`, JSON.stringify(v));
+  markDirty();
 }
 
 const getRaceResult = () => JSON.parse(localStorage.getItem(`race_result_${getActiveRaceId()}`) || 'null');
-const setRaceResult = v => localStorage.setItem(`race_result_${getActiveRaceId()}`, JSON.stringify(v));
+const setRaceResult = v => { localStorage.setItem(`race_result_${getActiveRaceId()}`, JSON.stringify(v)); markDirty(); };
 
 // ── フェーズ自動計算 ──────────────────────────
 function addDaysStr(dateStr, n) {
@@ -715,65 +732,74 @@ function computePhases(startStr, raceStr, goalMin) {
   ];
 }
 
+// 日付 → 「M月上旬/中旬/下旬目安」ラベル
+function tenDayLabel(d) {
+  const day = d.getDate();
+  const part = day <= 10 ? '上旬' : day <= 20 ? '中旬' : '下旬';
+  return `${d.getMonth()+1}月${part}目安`;
+}
+
 // 起動時・設定変更時に再初期化
 function applyRaceCfg() {
   const cfg = getRaceCfg();
   RACE_DATE_STR = cfg.date;
   RACE_DATE     = toDate(cfg.date);
   PHASES        = computePhases(cfg.startDate, cfg.date, cfg.goalMin);
-  // ゴール
-  localStorage.setItem(`goal_${getActiveRaceId()}`, cfg.goalMin);
   // ヘッダー更新
   const raceD = toDate(cfg.date);
   document.getElementById('headerRaceName').textContent = '🏃 ' + cfg.name;
   document.getElementById('headerCountdownLabel').textContent =
     `日後スタート（${raceD.getMonth()+1}月${raceD.getDate()}日）`;
-  // マイルストーン最終行更新
-  const ms6 = MILESTONES.find(m => m.id === 'm6');
-  if (ms6) { ms6.text = cfg.name + '完走！！ 🏅'; ms6.date = `${raceD.getMonth()+1}/${raceD.getDate()}`; }
+  // マイルストーンの時期ラベルを大会日程から再計算
+  const startD = toDate(cfg.startDate);
+  const totalMs = raceD - startD;
+  MILESTONES.forEach(m => {
+    if (m.id === 'm6') {
+      m.text = cfg.name + '完走！！ 🏅';
+      m.date = `${raceD.getMonth()+1}/${raceD.getDate()}`;
+    } else {
+      m.date = tenDayLabel(new Date(startD.getTime() + totalMs * m.frac));
+    }
+  });
 }
 
 let RACE_DATE_STR = '';
 let RACE_DATE     = null;
 let PHASES        = [];
 
+// frac = トレーニング期間全体（開始日→大会日）に対する達成目安時期の割合
+// 時期ラベルは applyRaceCfg() で大会の日程から自動計算される
 const MILESTONES = [
-  // ── 6月 ──
-  { id:'m1',        text:'30分間走り続けられた',            date:'6月上旬目安'  },
-  { id:'m2',        text:'5km完走',                        date:'6月中旬目安'  },
-  { id:'mp_7',      text:'7:00/km切りで5km走れた',         date:'6月下旬目安'  },
-  // ── 7月 ──
-  { id:'m_60min',   text:'60分連続で走れた',                date:'7月上旬目安'  },
-  { id:'m_7k',      text:'7km完走',                        date:'7月中旬目安'  },
-  { id:'mp_630',    text:'6:30/km切りで5km走れた',         date:'7月下旬目安'  },
-  // ── 8月 ──
-  { id:'m3',        text:'10km完走',                       date:'8月上旬目安'  },
-  { id:'mp_7_10',   text:'7:00/km切りで10km走れた',        date:'8月上旬目安'  },
-  { id:'mp_6',      text:'6:00/km切りで5km走れた',         date:'8月中旬目安'  },
-  { id:'m_90min',   text:'90分連続で走れた',                date:'8月中旬目安'  },
-  { id:'mp_630_10', text:'6:30/km切りで10km走れた',        date:'8月下旬目安'  },
-  { id:'m_15k',     text:'15km完走',                       date:'8月下旬目安'  },
-  // ── 9月 ──
-  { id:'m4',        text:'ハーフ（21km）完走 🎉',          date:'9月上旬目安'  },
-  { id:'mp_7_21',   text:'7:00/km切りで21km走れた',        date:'9月上旬目安'  },
-  { id:'m_120min',  text:'2時間連続で走れた',               date:'9月中旬目安'  },
-  { id:'mp_6_10',   text:'6:00/km切りで10km走れた',        date:'9月中旬目安'  },
-  { id:'mp_630_21', text:'6:30/km切りで21km走れた',        date:'9月下旬目安'  },
-  // ── 10月 ──
-  { id:'mp_6_21',   text:'6:00/km切りで21km走れた',        date:'10月上旬目安' },
-  { id:'m_25k',     text:'25km完走',                       date:'10月上旬目安' },
-  { id:'mp_545',    text:'5:45/km切りで10km走れた 🔥',     date:'10月中旬目安' },
-  { id:'m5',        text:'30km走完了',                     date:'10月中旬目安' },
-  { id:'mp_545_21', text:'5:45/km切りで21km走れた 🔥',     date:'10月下旬目安' },
-  // ── 本番 ──
-  { id:'m6',        text:'神戸マラソン完走！！ 🏅',        date:'11/22'        },
+  { id:'m1',        text:'30分間走り続けられた',            frac:0.13 },
+  { id:'m2',        text:'5km完走',                        frac:0.18 },
+  { id:'mp_7',      text:'7:00/km切りで5km走れた',         frac:0.23 },
+  { id:'m_60min',   text:'60分連続で走れた',                frac:0.28 },
+  { id:'m_7k',      text:'7km完走',                        frac:0.33 },
+  { id:'mp_630',    text:'6:30/km切りで5km走れた',         frac:0.38 },
+  { id:'m3',        text:'10km完走',                       frac:0.44 },
+  { id:'mp_7_10',   text:'7:00/km切りで10km走れた',        frac:0.44 },
+  { id:'mp_6',      text:'6:00/km切りで5km走れた',         frac:0.49 },
+  { id:'m_90min',   text:'90分連続で走れた',                frac:0.49 },
+  { id:'mp_630_10', text:'6:30/km切りで10km走れた',        frac:0.54 },
+  { id:'m_15k',     text:'15km完走',                       frac:0.54 },
+  { id:'m4',        text:'ハーフ（21km）完走 🎉',          frac:0.60 },
+  { id:'mp_7_21',   text:'7:00/km切りで21km走れた',        frac:0.60 },
+  { id:'m_120min',  text:'2時間連続で走れた',               frac:0.65 },
+  { id:'mp_6_10',   text:'6:00/km切りで10km走れた',        frac:0.65 },
+  { id:'mp_630_21', text:'6:30/km切りで21km走れた',        frac:0.70 },
+  { id:'mp_6_21',   text:'6:00/km切りで21km走れた',        frac:0.75 },
+  { id:'m_25k',     text:'25km完走',                       frac:0.75 },
+  { id:'mp_545',    text:'5:45/km切りで10km走れた 🔥',     frac:0.81 },
+  { id:'m5',        text:'30km走完了',                     frac:0.81 },
+  { id:'mp_545_21', text:'5:45/km切りで21km走れた 🔥',     frac:0.86 },
+  { id:'m6',        text:'神戸マラソン完走！！ 🏅',        frac:1 },
 ];
 
 // Storage
 const getRuns = () => JSON.parse(localStorage.getItem(`runs_${getActiveRaceId()}`) || '[]');
-const setRuns = v => localStorage.setItem(`runs_${getActiveRaceId()}`, JSON.stringify(v));
+const setRuns = v => { localStorage.setItem(`runs_${getActiveRaceId()}`, JSON.stringify(v)); markDirty(); };
 const getMS   = () => JSON.parse(localStorage.getItem(`ms_${getActiveRaceId()}`)   || '{}');
-const setMS   = v => localStorage.setItem(`ms_${getActiveRaceId()}`,   JSON.stringify(v));
+const setMS   = v => { localStorage.setItem(`ms_${getActiveRaceId()}`,   JSON.stringify(v)); markDirty(); };
 
 // Helpers
 function today() { return new Date(new Date().toLocaleDateString('sv')); }
@@ -806,7 +832,7 @@ const getPhaseIdx = () => {
   }
   return PHASES.length - 1;
 };
-const savePhaseIdx = v => localStorage.setItem(`phaseIdx_${getActiveRaceId()}`, v);
+const savePhaseIdx = v => { localStorage.setItem(`phaseIdx_${getActiveRaceId()}`, v); markDirty(); };
 function getPhase() { return PHASES[getPhaseIdx()]; }
 
 // Phase progress based on actual runs
@@ -842,7 +868,7 @@ function renderPhaseCard() {
   const isViewingCurrent = viewIdx === curIdx;
 
   const shortNames = ['Ph1','Ph2','Ph3','Ph4','BUF','TAP'];
-  const dates = ['5/11','6/16','8/4','9/22','10/20','11/9'];
+  const dates = PHASES.map(ph => fmtDate(ph.start));
 
   // Timeline
   const tlHTML = PHASES.map((ph, i) => {
@@ -1386,16 +1412,16 @@ function analyzePace() {
     else                  trend = { label:'安定 ➡️',   bg:'#FFF3E0', color:'#E65100' };
   }
 
-  // Pace ranges per run type（すべてマラソンペースより速め）
-  // 屋内（かなり速め）
-  const indoorLo = estMarathonPace - 0.60;
-  const indoorHi = estMarathonPace - 0.15;
-  // 通勤（速め・荷物あり考慮）
-  const commuteLo = estMarathonPace - 0.40;
-  const commuteHi = estMarathonPace - 0.05;
-  // 屋外ロング（やや速め）
-  const easyLo = estMarathonPace - 0.20;
-  const easyHi = estMarathonPace + 0.15;
+  // 練習ペース目安：Jack Daniels Running Formula 準拠（推定マラソンペース基準）
+  // 通勤 = Eペース（M+1:00〜+1:30）。回復と有酸素基礎、毎日走れる強度
+  const commuteLo = estMarathonPace + 1.0;
+  const commuteHi = estMarathonPace + 1.5;
+  // 屋外ロング = ロング走ペース（M+0:30〜+0:50）
+  const easyLo = estMarathonPace + 0.5;
+  const easyHi = estMarathonPace + 0.83;
+  // 屋内 = M〜Tペース（M-0:15〜+0:10）。質を上げる練習
+  const indoorLo = estMarathonPace - 0.25;
+  const indoorHi = estMarathonPace + 0.10;
 
   return {
     status: 'ok',
@@ -1455,16 +1481,16 @@ function renderPaceAnalysis() {
         <span class="pa-val">${paceToStr(a.estMarathonPace)} /km</span>
       </div>
       <div class="pa-row">
-        <span class="pa-lbl">屋内ラン目安</span>
-        <span class="pa-val">${paceToStr(a.indoorLo)}〜${paceToStr(a.indoorHi)} /km</span>
-      </div>
-      <div class="pa-row">
-        <span class="pa-lbl">通勤ラン目安</span>
+        <span class="pa-lbl">通勤ラン目安（Eペース）</span>
         <span class="pa-val">${paceToStr(a.commuteLo)}〜${paceToStr(a.commuteHi)} /km</span>
       </div>
       <div class="pa-row">
         <span class="pa-lbl">屋外ロング目安</span>
         <span class="pa-val">${paceToStr(a.easyLo)}〜${paceToStr(a.easyHi)} /km</span>
+      </div>
+      <div class="pa-row">
+        <span class="pa-lbl">屋内ラン目安（M〜T）</span>
+        <span class="pa-val">${paceToStr(a.indoorLo)}〜${paceToStr(a.indoorHi)} /km</span>
       </div>
       <div class="pa-row">
         <span class="pa-lbl">ペース推移</span>
@@ -1479,38 +1505,6 @@ function renderPaceAnalysis() {
   `;
 }
 
-// Apple Watch 取り込み
-async function importFromWatch() {
-  let text = '';
-  try {
-    text = await navigator.clipboard.readText();
-  } catch(e) {
-    alert('クリップボードの読み取りに失敗しました。\nショートカットを実行してからもう一度タップしてください。');
-    return;
-  }
-  let data;
-  try {
-    data = JSON.parse(text);
-    if (!data.km || !data.min) throw new Error();
-  } catch(e) {
-    alert('ショートカットを先に実行してください。\nクリップボードにランデータが見つかりません。');
-    return;
-  }
-  // フォームに自動セット
-  document.getElementById('fDate').value  = data.date || new Date().toLocaleDateString('sv');
-  document.getElementById('fType').value  = data.type || 'outdoor';
-  document.getElementById('fDist').value  = parseFloat(data.km).toFixed(2);
-  document.getElementById('fMin').value   = Math.round(data.min);
-  document.getElementById('fPace').value  = data.pace || '';
-  document.getElementById('fHR').value    = data.hr   || '';
-  document.getElementById('fNote').value  = data.note || 'Apple Watch';
-  document.getElementById('rpeLabel').textContent = 'タップして選択';
-  document.querySelectorAll('.rpe-btn').forEach(b => b.classList.remove('sel'));
-  if (data.rpe) selectRPE(parseInt(data.rpe));
-  onTypeChange();
-  document.getElementById('overlay').classList.add('open');
-}
-
 // Setup card
 function dismissSetup() {
   localStorage.setItem('setup_done', '1');
@@ -1523,19 +1517,159 @@ function initSetup() {
   }
 }
 
+// ── 全データの収集・適用（バックアップと同期の共通処理）──
+const APP_KEY_PREFIXES = ['runs_','ms_','race_cfg_','goal_','phaseIdx_','race_result_'];
+const APP_KEY_SINGLES  = ['race_list','active_race_id','setup_done'];
+
+function collectAllData() {
+  const data = {
+    version: 2,
+    exported: new Date().toISOString(),
+    lastModified: parseInt(localStorage.getItem('sync_last_modified') || '0'),
+    keys: {},
+  };
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (APP_KEY_PREFIXES.some(p => k.startsWith(p)) || APP_KEY_SINGLES.includes(k)) {
+      data.keys[k] = localStorage.getItem(k);
+    }
+  }
+  return data;
+}
+function applyAllData(data) {
+  if (!data || !data.keys) throw new Error('形式が正しくありません');
+  // 既存のアプリデータを消してから適用（削除された大会が復活しないように）
+  const del = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (APP_KEY_PREFIXES.some(p => k.startsWith(p)) || ['race_list','active_race_id'].includes(k)) del.push(k);
+  }
+  del.forEach(k => localStorage.removeItem(k));
+  Object.entries(data.keys).forEach(([k, v]) => localStorage.setItem(k, v));
+  if (data.lastModified) localStorage.setItem('sync_last_modified', String(data.lastModified));
+}
+
+// ── クラウド同期（GitHub Gist）─────────────────────────────
+const SYNC_FILE = 'marathon-tracker-data.json';
+const getSyncToken = () => localStorage.getItem('sync_token') || '';
+
+let syncTimer = null;
+// データ変更時に呼ぶ：更新時刻を記録し、同期が有効なら3秒後に自動アップロード
+function markDirty() {
+  localStorage.setItem('sync_last_modified', String(Date.now()));
+  if (!getSyncToken()) return;
+  clearTimeout(syncTimer);
+  setSyncStatus('☁️ 同期待機中…');
+  syncTimer = setTimeout(() => {
+    syncPush().then(() => setSyncStatus('✅ 同期済み ' + new Date().toLocaleTimeString('ja-JP', {hour:'2-digit',minute:'2-digit'})))
+              .catch(e => setSyncStatus('⚠️ 同期エラー（' + e.message + '）'));
+  }, 3000);
+}
+
+function setSyncStatus(msg) {
+  const el = document.getElementById('syncStatus');
+  if (el) el.textContent = msg;
+}
+function renderSyncUI() {
+  const on = !!getSyncToken();
+  const tokenArea = document.getElementById('syncTokenArea');
+  const activeArea = document.getElementById('syncActiveArea');
+  if (tokenArea) tokenArea.style.display = on ? 'none' : 'block';
+  if (activeArea) activeArea.style.display = on ? 'block' : 'none';
+  if (!on) setSyncStatus('未設定');
+}
+
+async function ghFetch(url, opt = {}) {
+  const res = await fetch(url, { ...opt, headers: {
+    'Authorization': 'token ' + getSyncToken(),
+    'Accept': 'application/vnd.github+json',
+    ...(opt.headers || {}),
+  }});
+  if (!res.ok) throw new Error('GitHub API ' + res.status);
+  return res.json();
+}
+
+async function findOrCreateGist() {
+  let id = localStorage.getItem('sync_gist_id');
+  if (id) {
+    try { await ghFetch('https://api.github.com/gists/' + id); return id; }
+    catch (e) { localStorage.removeItem('sync_gist_id'); }
+  }
+  // 既存の同期用gistを検索（他の端末が先に作成済みの場合）
+  const gists = await ghFetch('https://api.github.com/gists?per_page=100');
+  const hit = gists.find(g => g.files && g.files[SYNC_FILE]);
+  if (hit) { localStorage.setItem('sync_gist_id', hit.id); return hit.id; }
+  const created = await ghFetch('https://api.github.com/gists', {
+    method: 'POST',
+    body: JSON.stringify({
+      description: 'マラソン練習トラッカー 同期データ（自動生成）',
+      public: false,
+      files: { [SYNC_FILE]: { content: JSON.stringify(collectAllData()) } },
+    }),
+  });
+  localStorage.setItem('sync_gist_id', created.id);
+  return created.id;
+}
+
+async function syncPush() {
+  const id = await findOrCreateGist();
+  await ghFetch('https://api.github.com/gists/' + id, {
+    method: 'PATCH',
+    body: JSON.stringify({ files: { [SYNC_FILE]: { content: JSON.stringify(collectAllData()) } } }),
+  });
+}
+
+// リモートの方が新しければ取り込む。取り込んだらtrue
+async function syncPull() {
+  const id = await findOrCreateGist();
+  const g = await ghFetch('https://api.github.com/gists/' + id);
+  const f = g.files[SYNC_FILE];
+  if (!f) return false;
+  let content = f.content;
+  if (f.truncated) content = await (await fetch(f.raw_url)).text();
+  const remote = JSON.parse(content);
+  const localMod = parseInt(localStorage.getItem('sync_last_modified') || '0');
+  if ((remote.lastModified || 0) > localMod) { applyAllData(remote); return true; }
+  return false;
+}
+
+async function syncNow(manual) {
+  if (!getSyncToken()) { if (manual) alert('先にGitHubトークンを設定してください'); return; }
+  setSyncStatus('☁️ 同期中…');
+  try {
+    const applied = await syncPull();
+    if (applied) { applyRaceCfg(); refreshAll(); }
+    await syncPush();
+    setSyncStatus('✅ 同期済み ' + new Date().toLocaleTimeString('ja-JP', {hour:'2-digit',minute:'2-digit'}));
+    if (manual && applied) alert('他の端末のデータを取り込みました');
+  } catch (e) {
+    setSyncStatus('⚠️ 同期エラー（' + e.message + '）');
+    if (manual) alert('同期に失敗しました。トークンが正しいか（gist権限があるか）確認してください。\n' + e.message);
+  }
+}
+
+function saveSyncToken() {
+  const token = document.getElementById('syncToken').value.trim();
+  if (!token) { alert('トークンを入力してください'); return; }
+  localStorage.setItem('sync_token', token);
+  renderSyncUI();
+  syncNow(true);
+}
+function disableSync() {
+  if (!confirm('同期を解除しますか？（この端末のデータは残ります）')) return;
+  localStorage.removeItem('sync_token');
+  localStorage.removeItem('sync_gist_id');
+  document.getElementById('syncToken').value = '';
+  renderSyncUI();
+}
+
 // Export / Import
 function exportData() {
-  const data = {
-    version: 1,
-    exported: new Date().toISOString(),
-    runs: getRuns(),
-    milestones: getMS(),
-  };
-  const json = JSON.stringify(data, null, 2);
+  const json = JSON.stringify(collectAllData(), null, 2);
   // Try clipboard first
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(json).then(() => {
-      alert('データをクリップボードにコピーしました。\nメモアプリ等にペーストして保存してください。');
+      alert('全大会のデータをクリップボードにコピーしました。\nメモアプリ等にペーストして保存してください。');
     }).catch(() => showExportText(json));
   } else {
     showExportText(json);
@@ -1559,13 +1693,23 @@ function importData() {
   if (!json) { alert('JSONをペーストしてください'); return; }
   try {
     const data = JSON.parse(json);
-    if (!data.runs || !Array.isArray(data.runs)) throw new Error('形式が正しくありません');
-    if (!confirm(`${data.runs.length}件のランデータをインポートします。現在のデータは上書きされます。よろしいですか？`)) return;
-    setRuns(data.runs);
-    if (data.milestones) setMS(data.milestones);
+    if (data.keys) {
+      // 新形式：全大会のデータ
+      const raceCount = (JSON.parse(data.keys.race_list || '[]')).length;
+      if (!confirm(`${raceCount}大会分のデータをインポートします。現在のデータは上書きされます。よろしいですか？`)) return;
+      applyAllData(data);
+      markDirty();
+      applyRaceCfg();
+    } else if (data.runs && Array.isArray(data.runs)) {
+      // 旧形式：現在の大会のランのみ
+      if (!confirm(`${data.runs.length}件のランデータをインポートします。現在の大会のデータは上書きされます。よろしいですか？`)) return;
+      setRuns(data.runs);
+      if (data.milestones) setMS(data.milestones);
+    } else {
+      throw new Error('形式が正しくありません');
+    }
     document.getElementById('importArea').style.display = 'none';
-    render();
-    renderPaceAnalysis();
+    refreshAll();
     alert('インポートが完了しました！');
   } catch(e) {
     alert('データの読み込みに失敗しました。\n正しいJSONをペーストしてください。');
@@ -1573,21 +1717,29 @@ function importData() {
 }
 
 // ── Training Plan ────────────────────────────────────────────
-const getGoal = () => parseInt(localStorage.getItem(`goal_${getActiveRaceId()}`) || String(getRaceCfg().goalMin));
-const setGoalMin = v => { localStorage.setItem(`goal_${getActiveRaceId()}`, v); renderTrainingPlan(); };
+// 目標タイムは大会設定（race_cfg.goalMin）に一本化
+const getGoal = () => getRaceCfg().goalMin;
+
+function goalLabelOf(goalMin) {
+  if (goalMin === 210) return 'サブ3:30';
+  if (goalMin === 240) return 'サブ4';
+  if (goalMin === 270) return 'サブ4:30';
+  if (goalMin === 300) return 'サブ5';
+  return `目標${minToHHMM(goalMin)}`;
+}
 
 function selectGoal(min) {
-  setGoalMin(min);
-  document.querySelectorAll('.tp-goal-btn').forEach(b => {
-    b.classList.toggle('active', parseInt(b.dataset.min) === min);
-  });
+  const cfg = getRaceCfg();
+  setRaceCfg({ ...cfg, goalMin: min });
+  applyRaceCfg(); // フェーズ目標・ペースを再計算
+  refreshAll();
 }
 
 function renderTrainingPlan() {
   const el = document.getElementById('trainingPlan');
   const goalMin = getGoal();
   const goalPace = goalMin / 42.195; // min/km needed
-  const goalLabel = goalMin <= 240 ? 'サブ4' : goalMin <= 270 ? 'サブ4:30' : 'サブ5';
+  const goalLabel = goalLabelOf(goalMin);
 
   const t = today();
   const weeksLeft = Math.ceil((RACE_DATE - t) / (7 * 86400000));
@@ -1787,6 +1939,22 @@ function renderLottery() {
   }
 }
 
+// ── 本番記録バナー ───────────────────────────────────────────
+function renderResultBanner() {
+  const el = document.getElementById('raceResultBanner');
+  if (!el) return;
+  const r = getRaceResult();
+  if (r && r.finishTime) {
+    el.innerHTML = `<div class="card" style="background:linear-gradient(135deg,#FFF8E1,#FFECB3);border:1px solid #FFE082">
+      <div class="card-title" style="color:#B8860B">🏅 本番記録</div>
+      <div style="font-size:2.2em;font-weight:800;color:#023E8A;text-align:center;letter-spacing:1px">${r.finishTime}</div>
+      ${r.note ? `<div style="text-align:center;font-size:0.85em;color:#888;margin-top:6px">${r.note}</div>` : ''}
+    </div>`;
+  } else {
+    el.innerHTML = '';
+  }
+}
+
 // ── Calendar ─────────────────────────────────────────────────
 let calYear = new Date().getFullYear();
 let calMonth = new Date().getMonth();
@@ -1961,6 +2129,7 @@ function saveSettings() {
 
 function switchRace(id) {
   localStorage.setItem('active_race_id', id);
+  markDirty();
   applyRaceCfg();
   localStorage.removeItem(`phaseIdx_${id}`); // 日付ベースで再計算
   renderRaceChips();
@@ -1992,12 +2161,26 @@ function addNewRace() {
   if (!date) return;
   // ユニークIDを生成
   const id = 'race_' + Date.now();
-  const newCfg = { ...RACE_CFG_DEFAULT, name: name.trim(), date, startDate: new Date().toLocaleDateString('sv') };
+  // 抽選日は大会ごとに異なるため引き継がない（設定から個別に入力）
+  const newCfg = { ...RACE_CFG_DEFAULT, name: name.trim(), date, startDate: new Date().toLocaleDateString('sv'), lotteryDate: '' };
   localStorage.setItem(`race_cfg_${id}`, JSON.stringify(newCfg));
   const list = getRaceList();
   list.push({ id, name: name.trim(), date });
   setRaceList(list);
+  markDirty();
   switchRace(id);
+}
+
+function deleteRace() {
+  const list = getRaceList();
+  if (list.length <= 1) { alert('大会が1つしかないため削除できません'); return; }
+  const id = getActiveRaceId();
+  const race = list.find(r => r.id === id);
+  if (!confirm(`「${race ? race.name : id}」とその記録をすべて削除しますか？\nこの操作は取り消せません。`)) return;
+  ['runs_','ms_','race_cfg_','goal_','phaseIdx_','race_result_'].forEach(p => localStorage.removeItem(p + id));
+  setRaceList(list.filter(r => r.id !== id));
+  markDirty();
+  switchRace(getRaceList()[0].id);
 }
 
 // ── 旧データ移行 ──────────────────────────────
@@ -2022,6 +2205,7 @@ function migrateToMultiRace() {
 function refreshAll() {
   render();
   renderStats();
+  renderResultBanner();
   renderLottery();
   renderPhaseCard();
   renderCalendar(calYear, calMonth);
@@ -2032,21 +2216,15 @@ function refreshAll() {
 
 migrateToMultiRace(); // 旧データ移行（初回のみ）
 applyRaceCfg();
-render();
-renderStats();
-renderLottery();
-renderPhaseCard();
-renderCalendar(calYear, calMonth);
-renderWeekly();
-renderPaceAnalysis();
-renderTrainingPlan();
+refreshAll();
 initSetup();
+renderSyncUI();
+if (getSyncToken()) syncNow(false); // 起動時にクラウドと同期
 
-// Service Worker 登録（オフライン対応）
+// 旧Service Workerを解除（オフラインキャッシュ廃止・同期方式に移行）
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
-  });
+  navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(() => {});
+  if (window.caches) caches.keys().then(ks => ks.forEach(k => caches.delete(k))).catch(() => {});
 }
 </script>
 </body>
