@@ -223,6 +223,25 @@ html, body {
 .stat-item + .stat-item { border-left: 1px solid #f0f0f0; }
 .stat-val { font-size: 1.8em; font-weight: 800; color: #023E8A; }
 .stat-lbl { font-size: 0.72em; color: #999; margin-top: 2px; }
+/* ── 統計カード ── */
+.stx-nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.stx-nav button { background:#f0f4f8; border:none; border-radius:8px; width:32px; height:32px; font-size:1em; color:#0077B6; cursor:pointer; }
+.stx-nav button:disabled { opacity:0.3; }
+.stx-month { font-weight:700; color:#023E8A; font-size:1.05em; }
+.stx-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; }
+.stx-box { background:#f7fafc; border-radius:10px; padding:10px 12px; text-align:center; }
+.stx-box .v { font-size:1.35em; font-weight:800; color:#023E8A; }
+.stx-box .l { font-size:0.7em; color:#999; margin-top:2px; }
+.stx-cmp { font-size:0.72em; margin-top:2px; font-weight:700; }
+.stx-type-row { display:flex; align-items:center; gap:8px; padding:7px 2px; border-bottom:1px solid #f0f0f0; font-size:0.88em; }
+.stx-type-row:last-child { border-bottom:none; }
+.stx-type-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.stx-type-name { flex:1; color:#444; }
+.stx-type-val { font-weight:700; color:#023E8A; }
+.stx-type-sub { font-size:0.82em; color:#999; margin-left:4px; }
+.stx-sec-title { font-size:0.78em; font-weight:700; color:#888; margin:10px 0 4px; }
+.stx-bar-bg { flex:1; height:8px; background:#eef2f6; border-radius:4px; overflow:hidden; margin:0 6px; }
+.stx-bar-fill { height:100%; border-radius:4px; }
 
 /* CTA (kept for modal compatibility) */
 .btn-log:active { transform: scale(0.98); }
@@ -411,6 +430,10 @@ html, body {
           <div class="stat-item"><div class="stat-val" id="statKm">0.0</div><div class="stat-lbl">km 合計</div></div>
           <div class="stat-item"><div class="stat-val" id="statBest">0.0</div><div class="stat-lbl">km 最長</div></div>
         </div>
+      </div>
+      <div class="card">
+        <div class="card-title">統計</div>
+        <div id="statsView"></div>
       </div>
       <div class="card">
         <div class="card-title">カレンダー</div>
@@ -949,6 +972,114 @@ function render() {
       <div class="ms-date">${m.date}</div>
     </div>
   `).join('');
+}
+
+// ── 統計 ────────────────────────────────────────────
+let statsYM = null; // 'YYYY-MM' 表示中の月（null = 今月）
+
+function curYM() {
+  const t = new Date();
+  return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}`;
+}
+function shiftYM(ym, d) {
+  const [y, m] = ym.split('-').map(Number);
+  const dt = new Date(y, m - 1 + d, 1);
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`;
+}
+function statsShift(d) { statsYM = shiftYM(statsYM || curYM(), d); renderStats(); }
+
+function sumStats(runs) {
+  const km = runs.reduce((s,r) => s + r.km, 0);
+  const min = runs.reduce((s,r) => s + (r.min || 0), 0);
+  const kmWithTime = runs.filter(r => r.min).reduce((s,r) => s + r.km, 0);
+  const avgPace = kmWithTime > 0 ? min / kmWithTime : 0;
+  return { count: runs.length, km, min, avgPace, best: runs.length ? Math.max(...runs.map(r=>r.km)) : 0 };
+}
+
+function fmtDur(min) {
+  if (!min) return '0分';
+  const h = Math.floor(min / 60), m = Math.round(min % 60);
+  return h > 0 ? `${h}時間${m}分` : `${m}分`;
+}
+function fmtPaceVal(p) {
+  if (!p) return '−';
+  const total = Math.round(p * 60);
+  return `${Math.floor(total/60)}:${String(total%60).padStart(2,'0')}`;
+}
+
+function renderStats() {
+  const el = document.getElementById('statsView');
+  if (!el) return;
+  const ym = statsYM || curYM();
+  const [y, m] = ym.split('-').map(Number);
+  const runs = getRuns();
+
+  const monthRuns = runs.filter(r => r.date && r.date.startsWith(ym));
+  const prevYM = shiftYM(ym, -1);
+  const prevRuns = runs.filter(r => r.date && r.date.startsWith(prevYM));
+  const mo  = sumStats(monthRuns);
+  const pmo = sumStats(prevRuns);
+
+  // 前月比
+  const diff = mo.km - pmo.km;
+  const cmp = pmo.km > 0 || mo.km > 0
+    ? `<div class="stx-cmp" style="color:${diff >= 0 ? '#4CAF50' : '#e05555'}">${diff >= 0 ? '▲' : '▼'} 前月比 ${Math.abs(diff).toFixed(1)}km</div>`
+    : '';
+
+  // 週平均（その月の経過週数で割る）
+  const now = new Date();
+  const isCurMonth = ym === curYM();
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const elapsedDays = isCurMonth ? Math.min(now.getDate(), daysInMonth) : daysInMonth;
+  const weeklyAvg = mo.km / (elapsedDays / 7);
+
+  // タイプ別（月間・累計）
+  const types = ['commute', 'outdoor', 'indoor'];
+  const typeRow = (t, arr, maxKm) => {
+    const s = sumStats(arr.filter(r => r.type === t));
+    const pct = maxKm > 0 ? Math.round(s.km / maxKm * 100) : 0;
+    return `<div class="stx-type-row">
+      <div class="stx-type-dot" style="background:${TYPE_COLORS[t]}"></div>
+      <div class="stx-type-name">${TYPE_LABELS[t]}ラン</div>
+      <div class="stx-bar-bg"><div class="stx-bar-fill" style="width:${pct}%;background:${TYPE_COLORS[t]}"></div></div>
+      <div class="stx-type-val">${s.km.toFixed(1)}km<span class="stx-type-sub">${s.count}回</span></div>
+    </div>`;
+  };
+  const moMax  = Math.max(...types.map(t => sumStats(monthRuns.filter(r => r.type === t)).km), 0.1);
+  const allMax = Math.max(...types.map(t => sumStats(runs.filter(r => r.type === t)).km), 0.1);
+
+  // 継続日数（今日から遡って連続でランがある日数）
+  let streak = 0;
+  const runDates = new Set(runs.map(r => r.date));
+  const d = new Date(); d.setHours(0,0,0,0);
+  if (!runDates.has(fmtYMD(d))) d.setDate(d.getDate() - 1); // 今日まだ走ってなければ昨日から
+  while (runDates.has(fmtYMD(d))) { streak++; d.setDate(d.getDate() - 1); }
+
+  const nextDisabled = ym >= curYM() ? 'disabled' : '';
+
+  el.innerHTML = `
+    <div class="stx-nav">
+      <button onclick="statsShift(-1)">◀</button>
+      <div class="stx-month">${y}年${m}月</div>
+      <button onclick="statsShift(1)" ${nextDisabled}>▶</button>
+    </div>
+    <div class="stx-grid">
+      <div class="stx-box"><div class="v">${mo.km.toFixed(1)}<span style="font-size:0.55em"> km</span></div><div class="l">月間距離</div>${cmp}</div>
+      <div class="stx-box"><div class="v">${mo.count}<span style="font-size:0.55em"> 回</span></div><div class="l">月間回数</div></div>
+      <div class="stx-box"><div class="v">${fmtDur(mo.min)}</div><div class="l">月間走行時間</div></div>
+      <div class="stx-box"><div class="v">${fmtPaceVal(mo.avgPace)}<span style="font-size:0.55em">/km</span></div><div class="l">月間平均ペース</div></div>
+      <div class="stx-box"><div class="v">${weeklyAvg.toFixed(1)}<span style="font-size:0.55em"> km</span></div><div class="l">週平均距離</div></div>
+      <div class="stx-box"><div class="v">${mo.best.toFixed(1)}<span style="font-size:0.55em"> km</span></div><div class="l">月間最長</div></div>
+    </div>
+    <div class="stx-sec-title">📊 タイプ別（${m}月）</div>
+    ${types.map(t => typeRow(t, monthRuns, moMax)).join('')}
+    <div class="stx-sec-title">🏆 タイプ別（累計）</div>
+    ${types.map(t => typeRow(t, runs, allMax)).join('')}
+    ${streak >= 2 ? `<div style="text-align:center;margin-top:10px;font-size:0.85em;color:#FF9800;font-weight:700">🔥 ${streak}日連続ラン中！</div>` : ''}
+  `;
+}
+function fmtYMD(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
 function delRun(i) {
@@ -1890,6 +2021,7 @@ function migrateToMultiRace() {
 
 function refreshAll() {
   render();
+  renderStats();
   renderLottery();
   renderPhaseCard();
   renderCalendar(calYear, calMonth);
@@ -1901,6 +2033,7 @@ function refreshAll() {
 migrateToMultiRace(); // 旧データ移行（初回のみ）
 applyRaceCfg();
 render();
+renderStats();
 renderLottery();
 renderPhaseCard();
 renderCalendar(calYear, calMonth);
