@@ -1611,7 +1611,23 @@ async function findOrCreateGist() {
   return created.id;
 }
 
+// この端末にラン記録が1件でもあるか
+function localHasRuns() {
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k.startsWith('runs_')) {
+      const v = localStorage.getItem(k);
+      if (v && v !== '[]') return true;
+    }
+  }
+  return false;
+}
+
 async function syncPush() {
+  // 同期機能より前に記録されたデータには更新時刻が無いため、ここで付与
+  if (!parseInt(localStorage.getItem('sync_last_modified') || '0') && localHasRuns()) {
+    localStorage.setItem('sync_last_modified', String(Date.now()));
+  }
   const id = await findOrCreateGist();
   await ghFetch('https://api.github.com/gists/' + id, {
     method: 'PATCH',
@@ -1629,7 +1645,11 @@ async function syncPull() {
   if (f.truncated) content = await (await fetch(f.raw_url)).text();
   const remote = JSON.parse(content);
   const localMod = parseInt(localStorage.getItem('sync_last_modified') || '0');
+  const remoteHasRuns = remote.keys && Object.entries(remote.keys)
+    .some(([k, v]) => k.startsWith('runs_') && v && v !== '[]');
+  // リモートが新しい、またはこの端末が空でリモートに記録がある場合は取り込む
   if ((remote.lastModified || 0) > localMod) { applyAllData(remote); return true; }
+  if (!localHasRuns() && remoteHasRuns) { applyAllData(remote); return true; }
   return false;
 }
 
