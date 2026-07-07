@@ -1146,14 +1146,16 @@ function fmtYMD(d) {
 }
 
 // ── バッジ（全大会通算・Apple Health風）─────────────────────
+// 刻みは「1か月あたり約40〜50km・10回前後」のペースで
+// 後半も3〜4週間ごとに次のレベルへ届くよう段階的に設定
 const BADGE_DEFS = [
-  { id:'km',      name:'累計距離', unit:'km', icon:'🛣️', tiers:[10,50,100,250,500,1000], val:s=>s.km },
-  { id:'runs',    name:'累計回数', unit:'回', icon:'👟', tiers:[10,25,50,100,200],      val:s=>s.count },
-  { id:'commute', name:'通勤ラン', unit:'回', icon:'🏢', tiers:[10,25,50,100],          val:s=>s.commute },
-  { id:'outdoor', name:'屋外ラン', unit:'回', icon:'🌿', tiers:[10,25,50,100],          val:s=>s.outdoor },
-  { id:'indoor',  name:'屋内ラン', unit:'回', icon:'🏋️', tiers:[10,25,50,100],          val:s=>s.indoor },
-  { id:'streak',  name:'連続ラン', unit:'日', icon:'🔥', tiers:[3,5,7,14],              val:s=>s.bestStreak },
-  { id:'month',   name:'月間距離', unit:'km', icon:'📅', tiers:[30,50,100,150],         val:s=>s.bestMonthKm },
+  { id:'km',      name:'累計距離', unit:'km', icon:'🛣️', tiers:[10,25,50,75,100,150,200,250,300,400,500,650,800,1000], val:s=>s.km },
+  { id:'runs',    name:'累計回数', unit:'回', icon:'👟', tiers:[5,10,20,30,45,60,80,100,125,150,200],                  val:s=>s.count },
+  { id:'commute', name:'通勤ラン', unit:'回', icon:'🏢', tiers:[5,10,20,30,45,60,80,100],                              val:s=>s.commute },
+  { id:'outdoor', name:'屋外ラン', unit:'回', icon:'🌿', tiers:[5,10,20,30,45,60,80,100],                              val:s=>s.outdoor },
+  { id:'indoor',  name:'屋内ラン', unit:'回', icon:'🏋️', tiers:[5,10,20,30,45,60,80,100],                              val:s=>s.indoor },
+  { id:'streak',  name:'連続ラン', unit:'日', icon:'🔥', tiers:[2,3,4,5,7,10,14],                                      val:s=>s.bestStreak },
+  { id:'month',   name:'月間距離', unit:'km', icon:'📅', tiers:[20,30,40,50,65,80,100,120,150],                        val:s=>s.bestMonthKm },
 ];
 
 // 全大会のランをまとめて集計
