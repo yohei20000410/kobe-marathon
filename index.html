@@ -242,6 +242,27 @@ html, body {
 .stx-sec-title { font-size:0.78em; font-weight:700; color:#888; margin:10px 0 4px; }
 .stx-bar-bg { flex:1; height:8px; background:#eef2f6; border-radius:4px; overflow:hidden; margin:0 6px; }
 .stx-bar-fill { height:100%; border-radius:4px; }
+/* ── バッジ ── */
+.badge-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.badge-item { background:#f7fafc; border-radius:14px; padding:14px 10px; text-align:center; border:1px solid #eef2f6; }
+.badge-item.locked { opacity:0.5; filter:grayscale(1); }
+.badge-item.maxed { background:linear-gradient(135deg,#FFF8E1,#FFECB3); border-color:#FFE082; }
+.badge-icon { font-size:2.1em; line-height:1.2; }
+.badge-name { font-weight:700; font-size:0.85em; color:#023E8A; margin-top:4px; }
+.badge-lv { font-size:0.72em; color:#FF8F00; font-weight:800; margin-top:2px; }
+.badge-prog-bg { height:6px; background:#e8edf2; border-radius:3px; margin-top:8px; overflow:hidden; }
+.badge-prog-fill { height:100%; border-radius:3px; background:linear-gradient(90deg,#FFB300,#FF6F00); }
+.badge-sub { font-size:0.68em; color:#999; margin-top:4px; }
+/* ── お祝いポップアップ ── */
+.celebrate-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.55); display:none; align-items:center; justify-content:center; z-index:300; padding:24px; }
+.celebrate-overlay.open { display:flex; }
+.celebrate-card { background:white; border-radius:22px; padding:28px 24px; max-width:340px; width:100%; text-align:center; animation:celebratePop 0.45s cubic-bezier(0.34,1.56,0.64,1); box-shadow:0 20px 60px rgba(0,0,0,0.3); }
+@keyframes celebratePop { 0% { transform:scale(0.5); opacity:0; } 100% { transform:scale(1); opacity:1; } }
+.celebrate-emoji { font-size:3.2em; animation:celebrateBounce 0.8s ease infinite alternate; }
+@keyframes celebrateBounce { from { transform:translateY(0); } to { transform:translateY(-8px); } }
+.celebrate-title { font-size:1.2em; font-weight:800; color:#023E8A; margin:8px 0 14px; }
+.celebrate-item { background:#f7fafc; border-radius:10px; padding:10px 12px; margin-bottom:8px; font-size:0.9em; font-weight:600; color:#333; text-align:left; }
+.celebrate-hint { font-size:0.72em; color:#bbb; margin-top:10px; }
 
 /* CTA (kept for modal compatibility) */
 .btn-log:active { transform: scale(0.98); }
@@ -465,6 +486,11 @@ html, body {
         <div id="msList"></div>
       </div>
       <div class="card">
+        <div class="card-title">🏅 バッジ</div>
+        <div style="font-size:0.75em;color:#999;margin-bottom:10px">全大会の通算記録で自動獲得。レベルを上げていこう！</div>
+        <div class="badge-grid" id="badgeGrid"></div>
+      </div>
+      <div class="card">
         <div class="card-title">ラン履歴</div>
         <div id="runList"></div>
       </div>
@@ -558,6 +584,16 @@ html, body {
     </div>
     <button onclick="saveSettings()" style="width:100%;padding:14px;background:#023E8A;color:white;border:none;border-radius:12px;font-size:1em;font-weight:700">保存する</button>
     <button onclick="deleteRace()" style="width:100%;padding:11px;background:none;color:#C62828;border:1px solid #ffcdd2;border-radius:12px;font-size:0.85em;font-weight:600;margin-top:10px">🗑 この大会と記録をすべて削除</button>
+  </div>
+</div>
+
+<!-- 達成お祝いポップアップ -->
+<div class="celebrate-overlay" id="celebrateOverlay" onclick="closeCelebration()">
+  <div class="celebrate-card">
+    <div class="celebrate-emoji">🎉</div>
+    <div class="celebrate-title">達成おめでとう！</div>
+    <div id="celebrateList"></div>
+    <div class="celebrate-hint">タップで閉じる</div>
   </div>
 </div>
 
@@ -769,30 +805,31 @@ let PHASES        = [];
 
 // frac = トレーニング期間全体（開始日→大会日）に対する達成目安時期の割合
 // 時期ラベルは applyRaceCfg() で大会の日程から自動計算される
+// cond = 自動チェック条件（km:距離以上 / pace:ペース未満[分/km] / dur:時間以上[分]）
 const MILESTONES = [
-  { id:'m1',        text:'30分間走り続けられた',            frac:0.13 },
-  { id:'m2',        text:'5km完走',                        frac:0.18 },
-  { id:'mp_7',      text:'7:00/km切りで5km走れた',         frac:0.23 },
-  { id:'m_60min',   text:'60分連続で走れた',                frac:0.28 },
-  { id:'m_7k',      text:'7km完走',                        frac:0.33 },
-  { id:'mp_630',    text:'6:30/km切りで5km走れた',         frac:0.38 },
-  { id:'m3',        text:'10km完走',                       frac:0.44 },
-  { id:'mp_7_10',   text:'7:00/km切りで10km走れた',        frac:0.44 },
-  { id:'mp_6',      text:'6:00/km切りで5km走れた',         frac:0.49 },
-  { id:'m_90min',   text:'90分連続で走れた',                frac:0.49 },
-  { id:'mp_630_10', text:'6:30/km切りで10km走れた',        frac:0.54 },
-  { id:'m_15k',     text:'15km完走',                       frac:0.54 },
-  { id:'m4',        text:'ハーフ（21km）完走 🎉',          frac:0.60 },
-  { id:'mp_7_21',   text:'7:00/km切りで21km走れた',        frac:0.60 },
-  { id:'m_120min',  text:'2時間連続で走れた',               frac:0.65 },
-  { id:'mp_6_10',   text:'6:00/km切りで10km走れた',        frac:0.65 },
-  { id:'mp_630_21', text:'6:30/km切りで21km走れた',        frac:0.70 },
-  { id:'mp_6_21',   text:'6:00/km切りで21km走れた',        frac:0.75 },
-  { id:'m_25k',     text:'25km完走',                       frac:0.75 },
-  { id:'mp_545',    text:'5:45/km切りで10km走れた 🔥',     frac:0.81 },
-  { id:'m5',        text:'30km走完了',                     frac:0.81 },
-  { id:'mp_545_21', text:'5:45/km切りで21km走れた 🔥',     frac:0.86 },
-  { id:'m6',        text:'神戸マラソン完走！！ 🏅',        frac:1 },
+  { id:'m1',        text:'30分間走り続けられた',            frac:0.13, cond:{dur:30} },
+  { id:'m2',        text:'5km完走',                        frac:0.18, cond:{km:5} },
+  { id:'mp_7',      text:'7:00/km切りで5km走れた',         frac:0.23, cond:{km:5, pace:7.0} },
+  { id:'m_60min',   text:'60分連続で走れた',                frac:0.28, cond:{dur:60} },
+  { id:'m_7k',      text:'7km完走',                        frac:0.33, cond:{km:7} },
+  { id:'mp_630',    text:'6:30/km切りで5km走れた',         frac:0.38, cond:{km:5, pace:6.5} },
+  { id:'m3',        text:'10km完走',                       frac:0.44, cond:{km:10} },
+  { id:'mp_7_10',   text:'7:00/km切りで10km走れた',        frac:0.44, cond:{km:10, pace:7.0} },
+  { id:'mp_6',      text:'6:00/km切りで5km走れた',         frac:0.49, cond:{km:5, pace:6.0} },
+  { id:'m_90min',   text:'90分連続で走れた',                frac:0.49, cond:{dur:90} },
+  { id:'mp_630_10', text:'6:30/km切りで10km走れた',        frac:0.54, cond:{km:10, pace:6.5} },
+  { id:'m_15k',     text:'15km完走',                       frac:0.54, cond:{km:15} },
+  { id:'m4',        text:'ハーフ（21km）完走 🎉',          frac:0.60, cond:{km:21} },
+  { id:'mp_7_21',   text:'7:00/km切りで21km走れた',        frac:0.60, cond:{km:21, pace:7.0} },
+  { id:'m_120min',  text:'2時間連続で走れた',               frac:0.65, cond:{dur:120} },
+  { id:'mp_6_10',   text:'6:00/km切りで10km走れた',        frac:0.65, cond:{km:10, pace:6.0} },
+  { id:'mp_630_21', text:'6:30/km切りで21km走れた',        frac:0.70, cond:{km:21, pace:6.5} },
+  { id:'mp_6_21',   text:'6:00/km切りで21km走れた',        frac:0.75, cond:{km:21, pace:6.0} },
+  { id:'m_25k',     text:'25km完走',                       frac:0.75, cond:{km:25} },
+  { id:'mp_545',    text:'5:45/km切りで10km走れた 🔥',     frac:0.81, cond:{km:10, pace:5.75} },
+  { id:'m5',        text:'30km走完了',                     frac:0.81, cond:{km:30} },
+  { id:'mp_545_21', text:'5:45/km切りで21km走れた 🔥',     frac:0.86, cond:{km:21, pace:5.75} },
+  { id:'m6',        text:'神戸マラソン完走！！ 🏅',        frac:1 }, // 本番のみ手動チェック
 ];
 
 // Storage
@@ -1106,6 +1143,115 @@ function renderStats() {
 }
 function fmtYMD(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// ── バッジ（全大会通算・Apple Health風）─────────────────────
+const BADGE_DEFS = [
+  { id:'km',      name:'累計距離', unit:'km', icon:'🛣️', tiers:[10,50,100,250,500,1000], val:s=>s.km },
+  { id:'runs',    name:'累計回数', unit:'回', icon:'👟', tiers:[10,25,50,100,200],      val:s=>s.count },
+  { id:'commute', name:'通勤ラン', unit:'回', icon:'🏢', tiers:[10,25,50,100],          val:s=>s.commute },
+  { id:'outdoor', name:'屋外ラン', unit:'回', icon:'🌿', tiers:[10,25,50,100],          val:s=>s.outdoor },
+  { id:'indoor',  name:'屋内ラン', unit:'回', icon:'🏋️', tiers:[10,25,50,100],          val:s=>s.indoor },
+  { id:'streak',  name:'連続ラン', unit:'日', icon:'🔥', tiers:[3,5,7,14],              val:s=>s.bestStreak },
+  { id:'month',   name:'月間距離', unit:'km', icon:'📅', tiers:[30,50,100,150],         val:s=>s.bestMonthKm },
+];
+
+// 全大会のランをまとめて集計
+function computeLifetimeStats() {
+  const all = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k.startsWith('runs_')) {
+      try { all.push(...JSON.parse(localStorage.getItem(k) || '[]')); } catch(e) {}
+    }
+  }
+  const s = { km:0, count:all.length, commute:0, outdoor:0, indoor:0, bestStreak:0, bestMonthKm:0 };
+  const months = {};
+  all.forEach(r => {
+    s.km += r.km || 0;
+    if (s[r.type] !== undefined) s[r.type]++;
+    const ym = (r.date || '').slice(0, 7);
+    if (ym) months[ym] = (months[ym] || 0) + (r.km || 0);
+  });
+  s.bestMonthKm = Object.values(months).reduce((a,b) => Math.max(a,b), 0);
+  const dates = [...new Set(all.map(r => r.date).filter(Boolean))].sort();
+  let cur = dates.length ? 1 : 0;
+  s.bestStreak = cur;
+  for (let i = 1; i < dates.length; i++) {
+    cur = (toDate(dates[i]) - toDate(dates[i-1])) === 86400000 ? cur + 1 : 1;
+    if (cur > s.bestStreak) s.bestStreak = cur;
+  }
+  return s;
+}
+
+function renderBadges() {
+  const el = document.getElementById('badgeGrid');
+  if (!el) return;
+  const s = computeLifetimeStats();
+  el.innerHTML = BADGE_DEFS.map(def => {
+    const v = def.val(s);
+    const lv = def.tiers.filter(t => v >= t).length;
+    const next = def.tiers[lv];
+    const maxed = lv === def.tiers.length;
+    const pct = maxed ? 100 : Math.min(100, Math.round(v / next * 100));
+    const lvLabel = lv === 0 ? '未獲得' : maxed ? `Lv.${lv} MAX 👑` : `Lv.${lv}`;
+    const disp = def.unit === 'km' ? v.toFixed(1) : Math.round(v);
+    return `<div class="badge-item ${lv===0?'locked':''} ${maxed?'maxed':''}">
+      <div class="badge-icon">${def.icon}</div>
+      <div class="badge-name">${def.name}</div>
+      <div class="badge-lv">${lvLabel}</div>
+      <div class="badge-prog-bg"><div class="badge-prog-fill" style="width:${pct}%"></div></div>
+      <div class="badge-sub">${disp}${def.unit}${maxed ? '・全レベル達成！' : ` / 次 ${next}${def.unit}`}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── 達成の自動チェック＆お祝い ───────────────────────────────
+// 戻り値：今回新たに達成した項目のリスト
+function autoCheckAchievements() {
+  const newly = [];
+  // 1) マイルストーン：記録から条件を満たしたら自動チェック
+  //    （手動でチェックを外したもの ms[id]===false は尊重して再チェックしない）
+  const runs = getRuns();
+  const ms = getMS();
+  let msChanged = false;
+  MILESTONES.forEach(m => {
+    if (!m.cond || ms[m.id] !== undefined) return;
+    const hit = runs.some(r => {
+      if (m.cond.dur  && !(r.min >= m.cond.dur)) return false;
+      if (m.cond.km   && !(r.km  >= m.cond.km))  return false;
+      if (m.cond.pace && !(r.min && r.min / r.km < m.cond.pace)) return false;
+      return true;
+    });
+    if (hit) { ms[m.id] = true; msChanged = true; newly.push({ icon:'✅', text:'マイルストーン：' + m.text }); }
+  });
+  if (msChanged) setMS(ms);
+  // 2) バッジ：通算記録でレベル到達したら獲得
+  const s = computeLifetimeStats();
+  const seen = JSON.parse(localStorage.getItem('badges_seen') || '[]');
+  let seenChanged = false;
+  BADGE_DEFS.forEach(def => def.tiers.forEach((t, ti) => {
+    const bid = `${def.id}_${t}`;
+    if (def.val(s) >= t && !seen.includes(bid)) {
+      seen.push(bid);
+      seenChanged = true;
+      newly.push({ icon:def.icon, text:`バッジ獲得：${def.name} Lv.${ti+1}（${t}${def.unit}達成）` });
+    }
+  }));
+  if (seenChanged) { localStorage.setItem('badges_seen', JSON.stringify(seen)); markDirty(); }
+  return newly;
+}
+
+let celebrateTimer = null;
+function showCelebration(items) {
+  document.getElementById('celebrateList').innerHTML =
+    items.map(i => `<div class="celebrate-item">${i.icon} ${i.text}</div>`).join('');
+  document.getElementById('celebrateOverlay').classList.add('open');
+  clearTimeout(celebrateTimer);
+  celebrateTimer = setTimeout(closeCelebration, 8000);
+}
+function closeCelebration() {
+  document.getElementById('celebrateOverlay').classList.remove('open');
 }
 
 function delRun(i) {
@@ -1519,7 +1665,7 @@ function initSetup() {
 
 // ── 全データの収集・適用（バックアップと同期の共通処理）──
 const APP_KEY_PREFIXES = ['runs_','ms_','race_cfg_','goal_','phaseIdx_','race_result_'];
-const APP_KEY_SINGLES  = ['race_list','active_race_id','setup_done'];
+const APP_KEY_SINGLES  = ['race_list','active_race_id','setup_done','badges_seen'];
 
 function collectAllData() {
   const data = {
@@ -2223,8 +2369,10 @@ function migrateToMultiRace() {
 }
 
 function refreshAll() {
+  const newly = autoCheckAchievements(); // マイルストーン自動チェック＆バッジ判定
   render();
   renderStats();
+  renderBadges();
   renderResultBanner();
   renderLottery();
   renderPhaseCard();
@@ -2232,6 +2380,7 @@ function refreshAll() {
   renderWeekly();
   renderPaceAnalysis();
   renderTrainingPlan();
+  if (newly.length) showCelebration(newly);
 }
 
 migrateToMultiRace(); // 旧データ移行（初回のみ）
