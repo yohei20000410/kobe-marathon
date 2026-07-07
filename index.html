@@ -1154,6 +1154,9 @@ const BADGE_DEFS = [
   { id:'commute', name:'通勤ラン', unit:'回', icon:'🏢', tiers:[5,10,20,30,45,60,80,100],                              val:s=>s.commute },
   { id:'outdoor', name:'屋外ラン', unit:'回', icon:'🌿', tiers:[5,10,20,30,45,60,80,100],                              val:s=>s.outdoor },
   { id:'indoor',  name:'屋内ラン', unit:'回', icon:'🏋️', tiers:[5,10,20,30,45,60,80,100],                              val:s=>s.indoor },
+  { id:'commuteKm', name:'通勤距離', unit:'km', icon:'🚏', tiers:[10,25,50,75,100,150,200,300],                        val:s=>s.commuteKm },
+  { id:'outdoorKm', name:'屋外距離', unit:'km', icon:'🏞️', tiers:[10,25,50,75,100,150,200,300,400,500],               val:s=>s.outdoorKm },
+  { id:'indoorKm',  name:'屋内距離', unit:'km', icon:'🎽', tiers:[10,25,50,75,100,150,200,300],                        val:s=>s.indoorKm },
   { id:'streak',  name:'連続ラン', unit:'日', icon:'🔥', tiers:[2,3,4,5,7,10,14],                                      val:s=>s.bestStreak },
   { id:'month',   name:'月間距離', unit:'km', icon:'📅', tiers:[20,30,40,50,65,80,100,120,150],                        val:s=>s.bestMonthKm },
 ];
@@ -1167,11 +1170,13 @@ function computeLifetimeStats() {
       try { all.push(...JSON.parse(localStorage.getItem(k) || '[]')); } catch(e) {}
     }
   }
-  const s = { km:0, count:all.length, commute:0, outdoor:0, indoor:0, bestStreak:0, bestMonthKm:0 };
+  const s = { km:0, count:all.length, commute:0, outdoor:0, indoor:0,
+              commuteKm:0, outdoorKm:0, indoorKm:0, bestStreak:0, bestMonthKm:0 };
   const months = {};
   all.forEach(r => {
     s.km += r.km || 0;
     if (s[r.type] !== undefined) s[r.type]++;
+    if (s[r.type + 'Km'] !== undefined) s[r.type + 'Km'] += r.km || 0;
     const ym = (r.date || '').slice(0, 7);
     if (ym) months[ym] = (months[ym] || 0) + (r.km || 0);
   });
