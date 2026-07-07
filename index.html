@@ -1201,7 +1201,7 @@ function renderBadges() {
     const next = def.tiers[lv];
     const maxed = lv === def.tiers.length;
     const pct = maxed ? 100 : Math.min(100, Math.round(v / next * 100));
-    const lvLabel = lv === 0 ? '未獲得' : maxed ? `Lv.${lv} MAX 👑` : `Lv.${lv}`;
+    const lvLabel = lv === 0 ? `未獲得 0/${def.tiers.length}` : maxed ? `Lv.${lv}/${def.tiers.length} MAX 👑` : `Lv.${lv}/${def.tiers.length}`;
     const disp = def.unit === 'km' ? v.toFixed(1) : Math.round(v);
     return `<div class="badge-item ${lv===0?'locked':''} ${maxed?'maxed':''}">
       <div class="badge-icon">${def.icon}</div>
@@ -2076,16 +2076,21 @@ function switchTab(name) {
 }
 
 // ── Header collapse on scroll ───────────────────────────────
+// 縮小と拡大のしきい値を大きく離す（ヒステリシス）。
+// ヘッダー縮小で自身の高さが変わりスクロール位置が閾値を跨いで
+// 拡大⇄縮小を繰り返すガタつきを防ぐ
 document.getElementById('tab-home').addEventListener('scroll', function() {
   const header = document.getElementById('mainHeader');
-  if (this.scrollTop > 40) header.classList.add('compact');
-  else header.classList.remove('compact');
+  const isCompact = header.classList.contains('compact');
+  if (!isCompact && this.scrollTop > 90) header.classList.add('compact');
+  else if (isCompact && this.scrollTop < 5) header.classList.remove('compact');
 });
 
 // ── Lottery countdown ────────────────────────────────────────
 function renderLottery() {
   const el = document.getElementById('lotterySection');
-  const lotteryStr = getRaceCfg().lotteryDate;
+  const cfg = getRaceCfg();
+  const lotteryStr = cfg.lotteryDate;
   if (!lotteryStr) { el.innerHTML = ''; return; }
   const now = today();
   const diff = Math.ceil((toDate(lotteryStr) - now) / 86400000);
@@ -2097,19 +2102,52 @@ function renderLottery() {
         <span class="lottery-label">🎫 当選発表まで</span>
         <span class="lottery-days">${diff}日</span>
       </div>`;
-  } else if (diff >= -7) {
-    // 発表後7日以内：確認を促す
-    const passed = -diff;
-    const msg = passed === 0 ? '本日発表！' : `発表から${passed}日`;
+    return;
+  }
+  // 発表後
+  if (!cfg.lotteryResult) {
+    // 結果未入力：選択ボタンを表示（結果を入れるまで消えない）
     el.innerHTML = `
       <div class="lottery-divider"></div>
       <div class="lottery-row">
-        <span class="lottery-label">🎫 当選確認はお済みですか？</span>
-        <span class="lottery-days" style="font-size:0.85em">${msg}</span>
+        <span class="lottery-label">🎫 抽選結果は？</span>
+        <button onclick="setLotteryResult('won')" style="background:#FFD60A;color:#023E8A;border:none;border-radius:14px;padding:4px 14px;font-size:0.8em;font-weight:800">🎉 当選</button>
+        <button onclick="setLotteryResult('lost')" style="background:rgba(255,255,255,0.2);color:white;border:1px solid rgba(255,255,255,0.4);border-radius:14px;padding:4px 14px;font-size:0.8em;font-weight:700">😢 落選</button>
+      </div>`;
+    return;
+  }
+  // 結果入力済み：選択から7日間だけ表示（タップで変更可能）
+  const resDate = cfg.lotteryResultDate ? toDate(cfg.lotteryResultDate) : now;
+  const shownDays = Math.floor((now - resDate) / 86400000);
+  if (shownDays <= 7) {
+    const msg = cfg.lotteryResult === 'won'
+      ? '🎉 当選！本番に向けて頑張ろう🔥'
+      : '😢 落選…練習は無駄になりません。別の大会でリベンジ！';
+    el.innerHTML = `
+      <div class="lottery-divider"></div>
+      <div class="lottery-row" onclick="resetLotteryResult()" style="cursor:pointer">
+        <span class="lottery-label" style="font-size:0.8em">${msg}</span>
       </div>`;
   } else {
     el.innerHTML = '';
   }
+}
+
+function setLotteryResult(res) {
+  const cfg = getRaceCfg();
+  setRaceCfg({ ...cfg, lotteryResult: res, lotteryResultDate: new Date().toLocaleDateString('sv') });
+  renderLottery();
+  if (res === 'won') {
+    showCelebration([{ icon:'🎫', text:`${cfg.name} 当選おめでとうございます！` }]);
+  }
+}
+function resetLotteryResult() {
+  if (!confirm('抽選結果を選び直しますか？')) return;
+  const cfg = getRaceCfg();
+  delete cfg.lotteryResult;
+  delete cfg.lotteryResultDate;
+  setRaceCfg(cfg);
+  renderLottery();
 }
 
 // ── 本番記録バナー ───────────────────────────────────────────
@@ -2281,7 +2319,8 @@ function saveSettings() {
     ? (parseInt(document.getElementById('sCfgGoalMin').value) || 240)
     : parseInt(sel);
   const lotteryDate = document.getElementById('sCfgLottery').value || '';
-  setRaceCfg({ name, date, goalMin, startDate: start, lotteryDate });
+  // 既存の抽選結果などを保持したまま上書き
+  setRaceCfg({ ...getRaceCfg(), name, date, goalMin, startDate: start, lotteryDate });
   applyRaceCfg();
   localStorage.removeItem(`phaseIdx_${getActiveRaceId()}`); // フェーズをリセット
   // 本番記録の保存
