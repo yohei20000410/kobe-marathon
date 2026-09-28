@@ -620,15 +620,14 @@ html, body {
     <div class="fg">
       <label>種別</label>
       <select id="fType" onchange="onTypeChange()">
-        <option value="commute">通勤ラン（尼崎→青木）</option>
+        <option value="commute">朝ラン</option>
         <option value="outdoor">屋外ラン</option>
         <option value="indoor">屋内ラン（ジム）</option>
       </select>
     </div>
     <div class="fg">
       <label>距離（km）</label>
-      <input type="number" id="fDist" placeholder="例: 2.6" step="0.1" min="0" oninput="onDistChange()">
-      <div id="stationHint" style="font-size:0.75em;color:#aaa;margin-top:5px;">参考：1駅=1.3km　3駅=3.9km　5駅=6.5km　全区間=約17km</div>
+      <input type="number" id="fDist" placeholder="例: 4.0" step="0.1" min="0" oninput="onDistChange()">
     </div>
     <div class="row2">
       <div class="fg">
@@ -753,7 +752,7 @@ function computePhases(startStr, raceStr, goalMin) {
 
   return [
     { name:'Phase 1', sub:'走れる体を作る',    start:p1s,end:p1e,
-      goal:`目標：3.9kmを止まらず走れる\nペースは気にせずまず走り続ける`,
+      goal:`目標：4kmを止まらず走れる\nペースは気にせずまず走り続ける`,
       color:'#4CAF50' },
     { name:'Phase 2', sub:'10km完走',          start:p2s,end:p2e,
       goal:`目標：10km完走\n目安ペース ${fmtPaceMin(p2pace)}/km`,
@@ -878,7 +877,7 @@ const savePhaseIdx = v => { localStorage.setItem(`phaseIdx_${getActiveRaceId()}`
 function getPhase() { return PHASES[getPhaseIdx()]; }
 
 // Phase progress based on actual runs
-const PHASE_TARGETS = [3.9, 10, 21, 30, 0, 0]; // km target per phase (0 = time-based)
+const PHASE_TARGETS = [4, 10, 21, 30, 0, 0]; // km target per phase (0 = time-based)
 function getPhaseRunProgress(phaseIdx) {
   const target = PHASE_TARGETS[phaseIdx];
   if (!target) return { pct: 100, label: '調整フェーズ', val: '' };
@@ -1008,7 +1007,7 @@ function render() {
       const idx = runs.length - 1 - ri;
       const icon = r.type==='commute' ? '🏃' : r.type==='outdoor' ? '🌤️' : '🏋️';
       const badgeClass = r.type==='outdoor' ? 'long' : r.type==='indoor' ? 'other' : '';
-      const badgeText = r.type==='commute' ? '通勤ラン' : r.type==='outdoor' ? '屋外ラン' : '屋内ラン';
+      const badgeText = r.type==='commute' ? '朝ラン' : r.type==='outdoor' ? '屋外ラン' : '屋内ラン';
       const stationInfo = '';
       const paceInfo = r.min ? fmtPace(r.km, r.min) + '/km' : '';
       const note = r.note ? ` · ${r.note}` : '';
@@ -1156,10 +1155,10 @@ function fmtYMD(d) {
 const BADGE_DEFS = [
   { id:'km',      name:'累計距離', unit:'km', icon:'🛣️', tiers:[10,25,50,75,100,150,200,250,300,400,500,600,700,800,900,1000], val:s=>s.km },
   { id:'runs',    name:'累計回数', unit:'回', icon:'👟', tiers:[5,10,20,30,45,60,80,100,125,150,200],                  val:s=>s.count },
-  { id:'commute', name:'通勤ラン', unit:'回', icon:'🏢', tiers:[5,10,20,30,45,60,80,100],                              val:s=>s.commute },
+  { id:'commute', name:'朝ラン', unit:'回', icon:'🌅', tiers:[5,10,20,30,45,60,80,100],                              val:s=>s.commute },
   { id:'outdoor', name:'屋外ラン', unit:'回', icon:'🌿', tiers:[5,10,20,30,45,60,80,100],                              val:s=>s.outdoor },
   { id:'indoor',  name:'屋内ラン', unit:'回', icon:'🏋️', tiers:[5,10,20,30,45,60,80,100],                              val:s=>s.indoor },
-  { id:'commuteKm', name:'通勤距離', unit:'km', icon:'🚏', tiers:[10,25,50,75,100,125,150,175,200,225,250,275,300],   val:s=>s.commuteKm },
+  { id:'commuteKm', name:'朝ラン距離', unit:'km', icon:'📏', tiers:[10,25,50,75,100,125,150,175,200,225,250,275,300],   val:s=>s.commuteKm },
   { id:'outdoorKm', name:'屋外距離', unit:'km', icon:'🏞️', tiers:[10,25,50,75,100,150,200,250,300,350,400,450,500],  val:s=>s.outdoorKm },
   { id:'indoorKm',  name:'屋内距離', unit:'km', icon:'🎽', tiers:[10,25,50,75,100,125,150,175,200,225,250,275,300],   val:s=>s.indoorKm },
   { id:'streak',  name:'連続ラン', unit:'日', icon:'🔥', tiers:[2,3,4,5,7,10,14],                                      val:s=>s.bestStreak },
@@ -1350,7 +1349,7 @@ function onTypeChange() {
   const t = document.getElementById('fType').value;
   const hint = document.getElementById('stationHint');
   if (hint) hint.style.display = t === 'commute' ? 'block' : 'none';
-  document.getElementById('fDist').placeholder = t === 'indoor' ? '例: 3.0' : '例: 2.6';
+  document.getElementById('fDist').placeholder = t === 'indoor' ? '例: 3.0' : '例: 4.0';
   // 屋内ランならメモに「トレッドミル」を自動入力
   const noteEl = document.getElementById('fNote');
   if (t === 'indoor' && !noteEl.value) noteEl.value = 'トレッドミル';
@@ -1425,7 +1424,7 @@ function saveRun() {
 
 // ── Weekly Progress ──────────────────────────────────────────
 const TYPE_COLORS = { commute:'#0077B6', outdoor:'#4CAF50', indoor:'#FF9800' };
-const TYPE_LABELS = { commute:'通勤', outdoor:'屋外', indoor:'屋内' };
+const TYPE_LABELS = { commute:'朝ラン', outdoor:'屋外', indoor:'屋内' };
 
 function renderWeekly() {
   const runs = getRuns();
@@ -1571,7 +1570,7 @@ function analyzePace() {
   }
 
   // 練習ペース目安：Jack Daniels Running Formula 準拠（推定マラソンペース基準）
-  // 通勤 = Eペース（M+1:00〜+1:30）。回復と有酸素基礎、毎日走れる強度
+  // 朝ラン = Eペース（M+1:00〜+1:30）。回復と有酸素基礎、毎日走れる強度
   const commuteLo = estMarathonPace + 1.0;
   const commuteHi = estMarathonPace + 1.5;
   // 屋外ロング = ロング走ペース（M+0:30〜+0:50）
@@ -1623,7 +1622,7 @@ function renderPaceAnalysis() {
     ? '精度：高（ロング走データあり）'
     : a.longRunCount === 1
       ? '精度：中（ロング走1回）'
-      : '精度：低（通勤ランのみ・参考値）';
+      : '精度：低（朝ランのみ・参考値）';
 
   el.innerHTML = `
     <div class="pa-top">
@@ -1639,7 +1638,7 @@ function renderPaceAnalysis() {
         <span class="pa-val">${paceToStr(a.estMarathonPace)} /km</span>
       </div>
       <div class="pa-row">
-        <span class="pa-lbl">通勤ラン目安（Eペース）</span>
+        <span class="pa-lbl">朝ラン目安（Eペース）</span>
         <span class="pa-val">${paceToStr(a.commuteLo)}〜${paceToStr(a.commuteHi)} /km</span>
       </div>
       <div class="pa-row">
@@ -1992,10 +1991,10 @@ function getWeeklyMenu(phaseIdx, weeksLeft, a, goalPace) {
   // Long      : M+0:30〜+0:50/km  有酸素持久力。楽〜やや楽（RPE 4〜5）
   // M(Marathon): M±0:10/km        本番感覚定着（RPE 6〜7）
   // T(Threshold): M-0:10〜-0:25/km 乳酸閾値向上。きついが続けられる（RPE 7〜8）
-  // ※ 通勤ランは荷物あり・毎日走れる強度 → 常にEペース
+  // ※ 朝ランは毎日走れる強度 → 常にEペース
 
   const easyPace   = pr(goalPace + 1.0, goalPace + 1.5); // Eペース（全フェーズ共通）
-  const commutePace = easyPace;                           // 通勤は常にEペース
+  const commutePace = easyPace;                           // 朝ランは常にEペース
   const longRunPace = pr(goalPace + 0.5, goalPace + 0.83); // ロング走ペース
 
   // 屋内ラン：フェーズごとに強度が上がる
@@ -2020,7 +2019,7 @@ function getWeeklyMenu(phaseIdx, weeksLeft, a, goalPace) {
   if (phaseIdx === 4 || weeksLeft <= 4) {
     return {
       items: [
-        { icon:'🚶', title:'通勤ラン × 2〜3回', detail:`3〜5km　${commutePace}（Eペース・回復走）`, badge:'回復', badgeColor:'#E3F2FD', badgeText:'#1565C0' },
+        { icon:'🚶', title:'朝ラン × 2〜3回', detail:`3〜5km　${commutePace}（Eペース・回復走）`, badge:'回復', badgeColor:'#E3F2FD', badgeText:'#1565C0' },
         { icon:'⚡', title:`屋内ラン × 1回（${indoorZone}）`, detail:`8〜10km　${indoorPace}　目標ペースで走り切る`, badge:'Mペース確認', badgeColor:'#E8F5E9', badgeText:'#2E7D32' },
       ],
       advice: '目標ペースで10kmを余裕を持って走れれば本番準備完了のサインです。睡眠・栄養を優先しレスト多めにしましょう。'
@@ -2031,7 +2030,7 @@ function getWeeklyMenu(phaseIdx, weeksLeft, a, goalPace) {
   if (phaseIdx === 3) {
     return {
       items: [
-        { icon:'🚶', title:'通勤ラン × 2回', detail:`3.9〜7.8km　${commutePace}（Eペース・回復走）`, badge:'回復走', badgeColor:'#E3F2FD', badgeText:'#1565C0' },
+        { icon:'🚶', title:'朝ラン × 2回', detail:`30分前後・約4km　${commutePace}（Eペース・回復走）`, badge:'回復走', badgeColor:'#E3F2FD', badgeText:'#1565C0' },
         { icon:'⚡', title:`屋内ラン × 1回（${indoorZone}）`, detail:`10〜15km　${indoorPace}　乳酸閾値を高める`, badge:'最重要', badgeColor:'#FCE4EC', badgeText:'#C62828' },
         { icon:'🏔️', title:'屋外ロング × 1回', detail:`25〜30km　${longRunPace}（ロング走ペース）　後半失速NG`, badge:'週末', badgeColor:'#F3E5F5', badgeText:'#7B1FA2' },
       ],
@@ -2043,7 +2042,7 @@ function getWeeklyMenu(phaseIdx, weeksLeft, a, goalPace) {
   if (phaseIdx === 2) {
     return {
       items: [
-        { icon:'🚶', title:'通勤ラン × 2回', detail:`3.9〜6.5km　${commutePace}（Eペース・回復走）`, badge:'回復走', badgeColor:'#E3F2FD', badgeText:'#1565C0' },
+        { icon:'🚶', title:'朝ラン × 2回', detail:`30分前後・約4km　${commutePace}（Eペース・回復走）`, badge:'回復走', badgeColor:'#E3F2FD', badgeText:'#1565C0' },
         { icon:'🏃', title:`屋内ラン × 1回（${indoorZone}）`, detail:`8〜12km　${indoorPace}　本番ペースを体に覚えさせる`, badge:'Mペース走', badgeColor:'#E8F5E9', badgeText:'#2E7D32' },
         { icon:'🏔️', title:'屋外ロング × 1回', detail:`15〜21km　${longRunPace}（ロング走ペース）　ゆっくり長く`, badge:'週末', badgeColor:'#F3E5F5', badgeText:'#7B1FA2' },
       ],
@@ -2055,7 +2054,7 @@ function getWeeklyMenu(phaseIdx, weeksLeft, a, goalPace) {
   if (phaseIdx === 1) {
     return {
       items: [
-        { icon:'🚶', title:'通勤ラン × 2回', detail:`2.6〜5.2km　${commutePace}（Eペース）　止まらず走る`, badge:'継続', badgeColor:'#E3F2FD', badgeText:'#1565C0' },
+        { icon:'🚶', title:'朝ラン × 2回', detail:`30分前後・約4km　${commutePace}（Eペース）　止まらず走る`, badge:'継続', badgeColor:'#E3F2FD', badgeText:'#1565C0' },
         { icon:'🏃', title:`屋内ラン × 1回（${indoorZone}）`, detail:`5〜8km　${indoorPace}（Eペース）　毎回少しずつ距離アップ`, badge:'距離アップ', badgeColor:'#E8F5E9', badgeText:'#2E7D32' },
       ],
       advice: 'この段階はすべてEペース（会話できる楽さ、RPE3〜4）でOK。毎週の走行距離を前週比+10%以内で伸ばすことが怪我予防の鉄則です。速く走ろうとしなくてよい。'
@@ -2065,7 +2064,7 @@ function getWeeklyMenu(phaseIdx, weeksLeft, a, goalPace) {
   // ── Phase 1：基礎作り ───────────────────────────────────────
   return {
     items: [
-      { icon:'🚶', title:'通勤ラン × 2〜3回', detail:`1.3〜3.9km　${commutePace}（Eペース）　止まらず走る`, badge:'継続が大事', badgeColor:'#E3F2FD', badgeText:'#1565C0' },
+      { icon:'🚶', title:'朝ラン（30分前後・約4km）× 2〜3回', detail:`${commutePace}（Eペース）　止まらず走る`, badge:'継続が大事', badgeColor:'#E3F2FD', badgeText:'#1565C0' },
       { icon:'🏃', title:`屋内ラン × 1回（${indoorZone}）`, detail:`20〜30分　${indoorPace}（Eペース）　会話できる楽なペース`, badge:'週末', badgeColor:'#E8F5E9', badgeText:'#2E7D32' },
     ],
     advice: '目標は「30分間止まらず走れる体」。Eペース（RPE3〜4・隣の人と会話できる楽さ）を守ること。遅すぎると感じても、この強度が有酸素基盤を作ります。'
@@ -2239,7 +2238,7 @@ function showDayDetail(dateStr) {
   const label = `${d.getMonth()+1}月${d.getDate()}日（${'日月火水木金土'[d.getDay()]}）`;
   document.getElementById('dayPopupDate').textContent = label;
 
-  const TYPE_LABELS = { commute:'通勤ラン', outdoor:'屋外ラン', indoor:'屋内ラン' };
+  const TYPE_LABELS = { commute:'朝ラン', outdoor:'屋外ラン', indoor:'屋内ラン' };
   const BADGE_CLS   = { commute:'', outdoor:'other', indoor:'long' };
   const TYPE_ICON   = { commute:'🏃', outdoor:'🌿', indoor:'🏋️' };
 
