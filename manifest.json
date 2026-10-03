@@ -1,6 +1,6 @@
 {
-  "name": "神戸マラソン2026トラッカー",
-  "short_name": "神戸Marathon",
+  "name": "ランニング記録",
+  "short_name": "ランニング記録",
   "start_url": "/kobe-marathon/",
   "scope": "/kobe-marathon/",
   "display": "standalone",
