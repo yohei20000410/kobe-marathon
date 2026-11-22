@@ -604,7 +604,7 @@ html, body {
     </div>
     <div style="border-top:1px solid #f0f2f5;margin:20px 0 14px"></div>
     <div style="font-size:0.95em;font-weight:700;color:#023E8A;margin-bottom:4px">👟 靴</div>
-    <div style="font-size:0.72em;color:#aaa;margin-bottom:10px">目安は靴やメーカーで違います（よく言われるのは、本番用は200〜400kmほど、買い替えは500〜800kmほど）。本番用の目安を入れると「🏁 本番OK → 🏃 練習用」と分けて表示し、買い替えの目安の8割で「そろそろ」、超えたら「買い替えの目安」と知らせます。</div>
+    <div style="font-size:0.72em;color:#aaa;margin-bottom:10px">目安は靴やメーカーで違います。距離だけでなく、靴底のすり減りや履いたときの感じでも判断してください。本番用の目安（任意）を入れると「🏁 本番OK → 🏃 練習用」と分けて表示し、買い替えの目安の8割で「そろそろ」、超えたら「買い替えの目安」と知らせます。</div>
     <div id="shoeList"></div>
     <div id="shoeForm" style="display:none;background:#f7f9fc;border-radius:12px;padding:12px;margin-top:10px">
       <div class="fg" style="margin-bottom:10px">
@@ -635,7 +635,7 @@ html, body {
       </div>
       <div class="fg" style="margin-bottom:10px">
         <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">本番用の目安（km・任意。ここまでは本番に使える）</label>
-        <input type="number" id="shoeRaceKm" placeholder="例: 300（空なら使わない）" min="1" step="10" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
+        <input type="number" id="shoeRaceKm" placeholder="空なら使わない" min="1" step="10" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
       </div>
       <div class="fg" style="margin-bottom:12px">
         <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">買い替え（練習用）の目安（km）</label>
@@ -3195,8 +3195,8 @@ function refreshAll() {
 // ── アプリの版と、新しい版のお知らせ ─────────────────────────
 // 直して公開するたびに APP_VERSION を上げる（⚙ のいちばん下に表示）。
 // GitHub Pages は最大10分ほど古い版を返すことがあるため、起動時に最新のページを取りに行き、版が新しければ上にお知らせを出す
-const APP_VERSION = '2026-11-22.7';
-const APP_VERSION_NOTE = '靴の消去・本番用の目安';
+const APP_VERSION = '2026-11-23.1';
+const APP_VERSION_NOTE = '靴の消去・本番用の目安（目安の説明を見直し）';
 function showAppVersion() {
   const el = document.getElementById('appVersionLabel');
   if (el) el.textContent = `${APP_VERSION}（${APP_VERSION_NOTE}）`;
