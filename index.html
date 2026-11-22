@@ -6,6 +6,8 @@
 <title>ランニング記録</title>
 <!-- PWA / iOS ホーム画面アプリ化 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="ランニング記録">
 <meta name="theme-color" content="#023E8A">
@@ -1163,10 +1165,10 @@ function saveShoe() {
   const shoes = getShoes();
   if (editingShoeId) {
     const s = shoes.find(x => x.id === editingShoeId);
-    if (s) Object.assign(s, { brand, name, color, start, initKm, limitKm });
+    if (s) Object.assign(s, { brand, name, color, start, initKm, limitKm, updatedAt: Date.now() });
   } else {
     const id = 'shoe_' + Date.now();
-    shoes.push({ id, brand, name, color, start, initKm, limitKm, retired:false });
+    shoes.push({ id, brand, name, color, start, initKm, limitKm, retired:false, updatedAt: Date.now() });
   }
   setShoes(shoes);
   closeShoeForm();
@@ -1178,6 +1180,7 @@ function toggleShoeRetired(id) {
   if (!s) return;
   if (!s.retired && !confirm(`「${shoeNameText(s)}」を引退にしますか？\n（記録と距離は残ります。あとで戻すこともできます）`)) return;
   s.retired = !s.retired;
+  s.updatedAt = Date.now();
   setShoes(shoes);
   renderShoes();
 }
@@ -2238,7 +2241,25 @@ function applyAllData(data) {
     if (APP_KEY_PREFIXES.some(p => k.startsWith(p)) || ['race_list','active_race_id'].includes(k)) del.push(k);
   }
   del.forEach(k => localStorage.removeItem(k));
+  const localShoes = localStorage.getItem('shoes');
   Object.entries(data.keys).forEach(([k, v]) => localStorage.setItem(k, v));
+  // 靴は靴ごとに新しいほう（updatedAt が大きいほう）を残す。
+  // ほかの端末の古い靴の情報で、この端末で入れたメーカー・色などが消えないように
+  if (localShoes) {
+    try {
+      const mine = JSON.parse(localShoes), theirs = JSON.parse(data.keys.shoes || '[]');
+      // 更新時刻が同じ（どちらも記録なしなど）ときは、メーカー・色が多く入っているほうを残す
+      const filled = s => (s.brand ? 1 : 0) + (s.color ? 1 : 0);
+      const merged = theirs.map(t => {
+        const m = mine.find(x => x.id === t.id);
+        if (!m) return t;
+        const dm = m.updatedAt || 0, dt = t.updatedAt || 0;
+        return dm > dt || (dm === dt && filled(m) > filled(t)) ? m : t;
+      });
+      mine.forEach(m => { if (!merged.some(x => x.id === m.id)) merged.push(m); });
+      localStorage.setItem('shoes', JSON.stringify(merged));
+    } catch (e) { localStorage.setItem('shoes', localShoes); }
+  }
   if (data.lastModified) localStorage.setItem('sync_last_modified', String(data.lastModified));
 }
 
@@ -3120,8 +3141,8 @@ function refreshAll() {
 // ── アプリの版と、新しい版のお知らせ ─────────────────────────
 // 直して公開するたびに APP_VERSION を上げる（⚙ のいちばん下に表示）。
 // GitHub Pages は最大10分ほど古い版を返すことがあるため、起動時に最新のページを取りに行き、版が新しければ上にお知らせを出す
-const APP_VERSION = '2026-11-22.5';
-const APP_VERSION_NOTE = '靴のメーカー・色に対応';
+const APP_VERSION = '2026-11-22.6';
+const APP_VERSION_NOTE = '靴のメーカー・色に対応／同期で靴の情報が消えないように';
 function showAppVersion() {
   const el = document.getElementById('appVersionLabel');
   if (el) el.textContent = `${APP_VERSION}（${APP_VERSION_NOTE}）`;
@@ -3138,6 +3159,14 @@ async function checkAppUpdate() {
     if (!res.ok) return;
     const m = (await res.text()).match(/const APP_VERSION = '([^']+)'/);
     if (!m || verCmp(m[1], APP_VERSION) <= 0) return;
+    // 新しい版があれば自動で1回だけ読み直す（うまくいかなかったときのために、お知らせのボタンも出す）
+    let tried = null;
+    try { tried = sessionStorage.getItem('auto_update_to'); } catch (e) {}
+    if (tried !== m[1]) {
+      try { sessionStorage.setItem('auto_update_to', m[1]); } catch (e) {}
+      applyAppUpdate();
+      return;
+    }
     const el = document.getElementById('updateBanner');
     if (el) el.innerHTML = `<button onclick="applyAppUpdate()" style="margin-top:8px;width:100%;padding:9px;background:#FFD60A;color:#023E8A;border:none;border-radius:10px;font-weight:700;font-size:0.85em">🔄 新しい版（${m[1]}）があります。タップで更新</button>`;
   } catch (e) {}
@@ -3145,6 +3174,7 @@ async function checkAppUpdate() {
 async function applyAppUpdate() {
   // ブラウザに残っている古いページを新しいものに入れかえてから読み直す
   try { await fetch(location.pathname, { cache: 'reload' }); } catch (e) {}
+  try { await fetch(location.href, { cache: 'reload' }); } catch (e) {}
   location.reload();
 }
 
