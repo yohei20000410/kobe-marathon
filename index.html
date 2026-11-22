@@ -469,10 +469,7 @@ html, body {
         <div class="card-title">目標ペース分析（自動）</div>
         <div id="paceAnalysis"></div>
       </div>
-      <div class="card" style="margin-bottom:90px">
-        <div class="card-title">今週の練習メニュー提案</div>
-        <div id="trainingPlan"></div>
-      </div>
+      <div style="height:90px"></div>
     </div>
   </div>
 
@@ -546,6 +543,12 @@ html, body {
       <button onclick="addNewRace()" style="width:100%;padding:11px;background:#f0f4ff;color:#023E8A;border:1px dashed #023E8A;border-radius:10px;font-size:0.9em;font-weight:600">＋ 新しい大会を追加</button>
     </div>
     <div style="border-top:1px solid #f0f2f5;margin-bottom:16px"></div>
+    <div id="allViewNote" style="display:none;font-size:0.85em;color:#666;line-height:1.6;margin-bottom:8px">
+      📚 すべての大会の記録をまとめて表示しています。<br>
+      練習の段階・目標・カウントダウンは、大会を選ぶと表示されます。<br>
+      ここで記録を足すと、記録の日付から見ていちばん近い大会に入ります。
+    </div>
+    <div id="raceCfgForm">
     <div class="fg" style="margin-bottom:12px">
       <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">大会名</label>
       <input type="text" id="sCfgName" placeholder="例: 神戸マラソン 2026" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
@@ -555,18 +558,25 @@ html, body {
       <input type="date" id="sCfgDate" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
     </div>
     <div class="fg" style="margin-bottom:12px">
-      <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">目標タイム</label>
-      <select id="sCfgGoalSel" onchange="onGoalSelChange()" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
-        <option value="210">サブ3:30（3時間30分）</option>
-        <option value="240">サブ4（4時間）</option>
-        <option value="270">サブ4:30（4時間30分）</option>
-        <option value="300">サブ5（5時間）</option>
-        <option value="0">カスタム</option>
+      <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">距離（種目）</label>
+      <select id="sCfgDist" onchange="onCfgDistChange()" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
+        <option value="10k">10km</option>
+        <option value="half">ハーフマラソン（21.0975km）</option>
+        <option value="full">フルマラソン（42.195km）</option>
+        <option value="custom">その他（距離を入力）</option>
       </select>
+    </div>
+    <div class="fg" id="sCfgDistKmWrap" style="margin-bottom:12px;display:none">
+      <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">距離（km）</label>
+      <input type="number" id="sCfgDistKm" placeholder="例: 5 / 15 / 30" min="1" max="300" step="0.1" oninput="onCfgDistChange()" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
+    </div>
+    <div class="fg" style="margin-bottom:12px">
+      <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">目標タイム</label>
+      <select id="sCfgGoalSel" onchange="onGoalSelChange()" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em"></select>
     </div>
     <div class="fg" id="sCfgCustomWrap" style="margin-bottom:12px;display:none">
       <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">目標タイム（分）</label>
-      <input type="number" id="sCfgGoalMin" placeholder="例: 255（=4時間15分）" min="120" max="600" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
+      <input type="number" id="sCfgGoalMin" placeholder="例: 255（=4時間15分）" min="10" max="900" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
     </div>
     <div class="fg" style="margin-bottom:12px">
       <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">当選発表日（任意）</label>
@@ -584,6 +594,7 @@ html, body {
     </div>
     <button onclick="saveSettings()" style="width:100%;padding:14px;background:#023E8A;color:white;border:none;border-radius:12px;font-size:1em;font-weight:700">保存する</button>
     <button onclick="deleteRace()" style="width:100%;padding:11px;background:none;color:#C62828;border:1px solid #ffcdd2;border-radius:12px;font-size:0.85em;font-weight:600;margin-top:10px">🗑 この大会と記録をすべて削除</button>
+    </div>
   </div>
 </div>
 
@@ -615,16 +626,19 @@ html, body {
 
     <div class="fg">
       <label>日付</label>
-      <input type="date" id="fDate">
+      <input type="date" id="fDate" onchange="updateRaceNote()">
+      <div id="fRaceNote" style="font-size:0.75em;color:#888;margin-top:4px"></div>
     </div>
     <div class="fg">
       <label>種別</label>
       <select id="fType" onchange="onTypeChange()">
-        <option value="morning">朝ラン</option>
-        <option value="commute">通勤ラン</option>
-        <option value="outdoor">屋外ラン</option>
-        <option value="indoor">屋内ラン（ジム）</option>
+        <option value="jog">ジョグ（ゆっくり）</option>
+        <option value="long">ロング走</option>
+        <option value="pace">ペース走（テンポ走）</option>
+        <option value="interval">インターバル</option>
+        <option value="race">レース（大会・タイムトライアル）</option>
       </select>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-weight:400"><input type="checkbox" id="fIndoor" style="width:auto;margin:0"> 屋内（トレッドミル）</label>
     </div>
     <div class="fg">
       <label>距離（km）</label>
@@ -686,6 +700,43 @@ const STATION_KM = 1.3;
 const RACE_CFG_KEY = 'race_cfg'; // 旧キー（後方互換のため保持）
 const RACE_CFG_DEFAULT = { name:'神戸マラソン 2026', date:'2026-11-15', goalMin:240, startDate:'2026-05-11', lotteryDate:'2026-07-01' };
 
+// ── 距離（種目）ごとの設定 ──────────────────────────
+// distanceKm が無い大会（神戸マラソンなど距離選択より前に作った大会）はフルマラソンとして扱う
+const FULL_KM = 42.195, HALF_KM = 21.0975;
+const DIST_PRESETS = [
+  { key:'10k',  km:10,      label:'10km' },
+  { key:'half', km:HALF_KM, label:'ハーフ' },
+  { key:'full', km:FULL_KM, label:'フル' },
+];
+const raceDistKm = cfg => (cfg && cfg.distanceKm > 0) ? cfg.distanceKm : FULL_KM;
+const distPresetOf = km => DIST_PRESETS.find(p => Math.abs(p.km - km) < 0.01) || null;
+const distLabel = km => { const p = distPresetOf(km); return p ? p.label : `${+(+km).toFixed(2)}km`; };
+// 練習の組み立ては近い種目に合わせる（自由な距離もここで振り分け）
+const profileOf = km => km <= 15 ? '10k' : km <= 30 ? 'half' : 'full';
+const GOAL_PRESETS = {
+  full:  [{min:210,label:'サブ3:30'},{min:240,label:'サブ4'},{min:270,label:'サブ4:30'},{min:300,label:'サブ5'}],
+  half:  [{min:105,label:'サブ1:45'},{min:120,label:'サブ2'},{min:135,label:'サブ2:15'},{min:150,label:'サブ2:30'}],
+  '10k': [{min:40,label:'40分切り'},{min:45,label:'45分切り'},{min:50,label:'50分切り'},{min:55,label:'55分切り'},{min:60,label:'60分切り'}],
+};
+const GOAL_BUTTONS = { full:[240,270,300], half:[120,135,150], '10k':[45,50,55] };
+const GOAL_DEFAULT = { full:240, half:135, '10k':50 };
+// 自由な距離は目標タイムを「カスタム」で入れる
+const goalPresetsFor = km => distPresetOf(km) ? GOAL_PRESETS[profileOf(km)] : [];
+// Riegel の式：T2 = T1 × (D2/D1)^1.06（距離の違う大会のタイム換算）
+const riegel = (min, fromKm, toKm) => min * Math.pow(toKm / fromKm, 1.06);
+// 分 → 「48分」「2:15」（1時間未満は分で表示）※走行時間の fmtDur とは別
+function fmtGoalTime(min) {
+  if (min < 60) {
+    const s = Math.round(min * 60);
+    return s % 60 ? `${Math.floor(s/60)}分${s%60}秒` : `${s/60}分`;
+  }
+  return minToHHMM(min);
+}
+function goalLabelOf(goalMin, km) {
+  const p = goalPresetsFor(km === undefined ? FULL_KM : km).find(g => g.min === goalMin);
+  return p ? p.label : `目標${fmtGoalTime(goalMin)}`;
+}
+
 // 神戸マラソン2026の本番日は 11/22 → 11/15 に確定。保存済みの旧日付は読み込み時に読み替える
 // （保存データ自体は書き換えない：同期の更新時刻を動かして他端末の記録を上書きしないため）
 const KOBE26_OLD_DATE = '2026-11-22';
@@ -718,17 +769,24 @@ function fmtPaceMin(p) {
   return `${Math.floor(total/60)}:${String(total%60).padStart(2,'0')}`;
 }
 
-function computePhases(startStr, raceStr, goalMin) {
+// 距離ごとの段階の日数（Phase2, Phase3, Phase4, バッファー, テーパー）と、段階ごとの最長距離の目標
+const PHASE_DAYS    = { full:[49,49,28,21,14], half:[35,35,28,14,14], '10k':[28,21,21,7,14] };
+const PHASE_TARGETS_BY = { full:[4,10,21,30,0,0], half:[4,10,15,18,0,0], '10k':[4,7,10,12,0,0] };
+
+function computePhases(startStr, raceStr, goalMin, distKm) {
+  const km = distKm || FULL_KM;
+  const prof = profileOf(km);
+  const [D2, D3, D4, DB, DT] = PHASE_DAYS[prof];
   const totalDays = Math.ceil((toDate(raceStr) - toDate(startStr)) / 86400000);
-  const baseFixed = 49 + 49 + 28 + 21 + 14; // 161日
+  const baseFixed = D2 + D3 + D4 + DB + DT; // フル：161日
   let d;
   if (totalDays < baseFixed + 14) {
     const s = Math.max(0.3, totalDays / (baseFixed + 14));
-    d = { ph1: Math.max(7, Math.round(14*s)), ph2: Math.max(7, Math.round(49*s)),
-          ph3: Math.max(7, Math.round(49*s)), ph4: Math.max(7, Math.round(28*s)),
-          buf: Math.max(5, Math.round(21*s)), tap: Math.max(5, Math.round(14*s)) };
+    d = { ph1: Math.max(7, Math.round(14*s)), ph2: Math.max(7, Math.round(D2*s)),
+          ph3: Math.max(7, Math.round(D3*s)), ph4: Math.max(7, Math.round(D4*s)),
+          buf: Math.max(5, Math.round(DB*s)), tap: Math.max(5, Math.round(DT*s)) };
   } else {
-    d = { ph1: totalDays - baseFixed, ph2:49, ph3:49, ph4:28, buf:21, tap:14 };
+    d = { ph1: totalDays - baseFixed, ph2:D2, ph3:D3, ph4:D4, buf:DB, tap:DT };
   }
   const p1s=startStr, p1e=addDaysStr(p1s,d.ph1-1);
   const p2s=addDaysStr(p1e,1), p2e=addDaysStr(p2s,d.ph2-1);
@@ -739,8 +797,43 @@ function computePhases(startStr, raceStr, goalMin) {
 
   // 目標タイムからフェーズ別練習ペースを算出
   // 本番ペース基準に各フェーズで段階的に追い込む
-  const gMin = goalMin || 240;
-  const racePace = gMin / 42.195; // 本番目標ペース（分/km）
+  const gMin = goalMin || GOAL_DEFAULT[prof];
+  const racePace = gMin / km; // 本番目標ペース（分/km）
+  const raceTimeLabel = `${fmtGoalTime(gMin)}（${fmtPaceMin(racePace)}/km）`;
+
+  if (prof === '10k') {
+    // 健康・運動科の10km計画（再開 → 土台づくり → 強化 → 最後の確かめ → 調整）に合わせた段階
+    return [
+      { name:'Phase 1', sub:'再開・走れる体',  start:p1s,end:p1e,
+        goal:`目標：30分間止まらず走れる\nすべてゆっくり（会話できるペース）`, color:'#4CAF50' },
+      { name:'Phase 2', sub:'土台づくり',      start:p2s,end:p2e,
+        goal:`目標：45〜60分（7km前後）をゆっくり走れる\n週1回の流し（20秒×4〜6本）`, color:'#2196F3' },
+      { name:'Phase 3', sub:'強化①',          start:p3s,end:p3e,
+        goal:`目標：ゆっくり10km＋週1回の速い練習\nテンポ走 ${fmtPaceMin(racePace + 0.2)}/km・インターバル ${fmtPaceMin(racePace)}/km`, color:'#9C27B0' },
+      { name:'Phase 4', sub:'強化②',          start:p4s,end:p4e,
+        goal:`目標：目標ペース ${fmtPaceMin(racePace)}/km で6km\nゆっくりの長め 12〜14km`, color:'#FF5722' },
+      { name:'バッファー',sub:'最後の確かめ',  start:bs, end:be,
+        goal:`目標ペースで6km（または4km×2本）\n本番のペースを決める`, color:'#FF9800' },
+      { name:'テーパー', sub:'調整',           start:ts, end:te,
+        goal:`目標タイム ${raceTimeLabel}\n距離を3〜4割減らす・速さは少しだけ残す`, color:'#607D8B' },
+    ];
+  }
+  if (prof === 'half') {
+    return [
+      { name:'Phase 1', sub:'走れる体を作る',  start:p1s,end:p1e,
+        goal:`目標：4kmを止まらず走れる\nペースは気にせずまず走り続ける`, color:'#4CAF50' },
+      { name:'Phase 2', sub:'10km完走',        start:p2s,end:p2e,
+        goal:`目標：10km完走\n目安ペース ${fmtPaceMin(racePace + 1.0)}/km`, color:'#2196F3' },
+      { name:'Phase 3', sub:'15km領域',        start:p3s,end:p3e,
+        goal:`目標：15km完走\n目安ペース ${fmtPaceMin(racePace + 0.6)}/km`, color:'#9C27B0' },
+      { name:'Phase 4', sub:'ハーフ仕上げ',    start:p4s,end:p4e,
+        goal:`目標：18km走完了・目標ペースで8km\n目安ペース ${fmtPaceMin(racePace + 0.3)}/km`, color:'#FF5722' },
+      { name:'バッファー',sub:'調整期',        start:bs, end:be,
+        goal:`体調管理・最終調整\n目標ペース ${fmtPaceMin(racePace)}/km で8km確認`, color:'#FF9800' },
+      { name:'テーパー', sub:'本番準備',       start:ts, end:te,
+        goal:`目標タイム ${raceTimeLabel}\n軽いジョグのみ・装備・睡眠・食事管理`, color:'#607D8B' },
+    ];
+  }
   // フェーズ別目安ペース：本番より余裕を持ち、後半フェーズほど速く
   const p2pace = racePace + 1.0;  // Phase2: 本番+1:00/km（10kmゆっくり完走）
   const p3pace = racePace + 0.6;  // Phase3: 本番+0:36/km（ハーフ）
@@ -785,7 +878,10 @@ function applyRaceCfg() {
   const cfg = getRaceCfg();
   RACE_DATE_STR = cfg.date;
   RACE_DATE     = toDate(cfg.date);
-  PHASES        = computePhases(cfg.startDate, cfg.date, cfg.goalMin);
+  const distKm  = raceDistKm(cfg);
+  PHASES        = computePhases(cfg.startDate, cfg.date, cfg.goalMin, distKm);
+  PHASE_TARGETS = PHASE_TARGETS_BY[profileOf(distKm)];
+  ACTIVE_MS     = buildMilestones(cfg);
   // ヘッダー更新
   const raceD = toDate(cfg.date);
   document.getElementById('headerRaceName').textContent = '🏃 ' + cfg.name;
@@ -794,7 +890,7 @@ function applyRaceCfg() {
   // マイルストーンの時期ラベルを大会日程から再計算
   const startD = toDate(cfg.startDate);
   const totalMs = raceD - startD;
-  MILESTONES.forEach(m => {
+  ACTIVE_MS.forEach(m => {
     if (m.id === 'm6') {
       m.text = cfg.name + '完走！！ 🏅';
       m.date = `${raceD.getMonth()+1}/${raceD.getDate()}`;
@@ -807,6 +903,8 @@ function applyRaceCfg() {
 let RACE_DATE_STR = '';
 let RACE_DATE     = null;
 let PHASES        = [];
+let PHASE_TARGETS = PHASE_TARGETS_BY.full; // km target per phase (0 = time-based)
+let ACTIVE_MS     = [];
 
 // frac = トレーニング期間全体（開始日→大会日）に対する達成目安時期の割合
 // 時期ラベルは applyRaceCfg() で大会の日程から自動計算される
@@ -837,15 +935,101 @@ const MILESTONES = [
   { id:'m6',        text:'神戸マラソン完走！！ 🏅',        frac:1 }, // 本番のみ手動チェック
 ];
 
-// 朝ランは 2026-09 から。それ以前の短い記録は通勤ラン。
-// 9/1 以降に「通勤ラン（commute）」で保存された記録は、読み込み時に朝ラン（morning）として扱う
+// 大会の距離に合ったマイルストーンだけを出す（フルは今までどおり全部）
+// フル以外：大会の距離より長い距離・長すぎる時間の項目を外し、目標ペースの項目を足す
+function buildMilestones(cfg) {
+  const km = raceDistKm(cfg);
+  if (profileOf(km) === 'full') return MILESTONES;
+  const goalMin = cfg.goalMin || GOAL_DEFAULT[profileOf(km)];
+  const gp = goalMin / km;
+  const maxDur = Math.max(60, goalMin * 1.5);
+  const list = MILESTONES.filter(m => m.id !== 'm6' && m.cond
+    && (!m.cond.km || m.cond.km <= km) && (!m.cond.dur || m.cond.dur <= maxDur));
+  const gpKm = Math.max(3, Math.round(km * 0.6));
+  list.push(
+    { id:'gp_3',   text:`目標ペース（${fmtPaceMin(gp)}/km）で3km走れた`,    frac:0.80, cond:{km:3,    pace:gp + 0.01} },
+    { id:'gp_long',text:`目標ペース（${fmtPaceMin(gp)}/km）で${gpKm}km走れた 🔥`, frac:0.92, cond:{km:gpKm, pace:gp + 0.01} },
+    MILESTONES.find(m => m.id === 'm6'),
+  );
+  return list.sort((a, b) => a.frac - b.frac);
+}
+
+// ── 記録の種類（2026-11-22〜：練習の目的で分ける） ──────────────
+// ジョグ・ロング走・ペース走・インターバル・レース。屋内（トレッドミル）は種類ではなく印（indoor: true）
+const TYPE_INFO = {
+  jog:      { label:'ジョグ',       icon:'🏃', color:'#0077B6', cls:'' },
+  long:     { label:'ロング走',     icon:'🏔️', color:'#4CAF50', cls:'long' },
+  pace:     { label:'ペース走',     icon:'⚡', color:'#FF9800', cls:'other' },
+  interval: { label:'インターバル', icon:'🔁', color:'#E91E63', cls:'other' },
+  race:     { label:'レース',       icon:'🏅', color:'#B8860B', cls:'long' },
+};
+const RUN_TYPES = Object.keys(TYPE_INFO);
+// それより前の種類（朝ラン・通勤ラン・屋外ラン・屋内ラン）の記録は、保存データを書き換えずに読み込み時に置きかえる
+//   大会の日→レース、メモに「インターバル」→インターバル、「テンポ」「ペース走」→ペース走、15km以上→ロング走、ほか→ジョグ
+//   屋内ラン・メモに「トレッドミル」→屋内の印
+// 前の種類は legacyType として持ち、前の種類のバッジ（取ったもの）の集計に使う
 // （保存データ自体は書き換えない：同期の更新時刻を動かして他端末の記録を上書きしないため）
-const MORNING_FROM = '2026-09-01';
-const normRun = r => (r.type === 'commute' && (r.date || '') >= MORNING_FROM) ? { ...r, type: 'morning' } : r;
+const LEGACY_TYPES = ['morning','commute','outdoor','indoor'];
+const MORNING_FROM = '2026-09-01'; // 9/1 以降の通勤ランは朝ラン（前の種類での区分）
+function normRun(r, raceDate) {
+  if (RUN_TYPES.includes(r.type)) return { ...r, indoor: !!r.indoor, legacyType: r.oldType || r.legacyType || undefined };
+  let legacy = LEGACY_TYPES.includes(r.type) ? r.type : 'commute';
+  if (legacy === 'commute' && (r.date || '') >= MORNING_FROM) legacy = 'morning';
+  const note = r.note || '';
+  const type = (raceDate && r.date === raceDate) ? 'race'
+    : /インターバル/.test(note) ? 'interval'
+    : /テンポ|ペース走/.test(note) ? 'pace'
+    : (r.km || 0) >= 15 ? 'long' : 'jog';
+  return { ...r, type, indoor: legacy === 'indoor' || /トレッドミル/.test(note), legacyType: legacy };
+}
+const raceDateOf = id => {
+  try { return fixKobe26Date(id, { ...RACE_CFG_DEFAULT, ...JSON.parse(localStorage.getItem(`race_cfg_${id}`) || '{}') }).date; }
+  catch(e) { return null; }
+};
+
+// ── 「すべて（通算）」表示 ─────────────────────────────
+// この端末だけの表示の切りかえ（同期しない・保存データは書き換えない）。
+// 「すべて」のときは全大会の記録を日付順にまとめ、どの大会の記録か（_raceId と、その大会の中での位置 _idx）を持たせる
+const ALL_VIEW_KEY = 'view_all_races';
+const isAllView = () => localStorage.getItem(ALL_VIEW_KEY) === '1';
+const raceNameOf = id => (getRaceList().find(r => r.id === id) || {}).name || id;
+function allRaceIds() {
+  const ids = getRaceList().map(r => r.id);
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith('runs_') && !ids.includes(k.slice(5))) ids.push(k.slice(5));
+  }
+  return ids;
+}
+// 「すべて」表示で新しく記録するときの保存先：記録の日付から見ていちばん近い（その日以降の）大会。無ければいちばん新しい大会
+function targetRaceFor(dateStr) {
+  const list = getRaceList().filter(r => r.date).sort((a, b) => a.date.localeCompare(b.date));
+  if (!list.length) return getActiveRaceId();
+  return (list.find(r => r.date >= (dateStr || '')) || list[list.length - 1]).id;
+}
 
 // Storage
-const getRuns = () => JSON.parse(localStorage.getItem(`runs_${getActiveRaceId()}`) || '[]').map(normRun);
-const setRuns = v => { localStorage.setItem(`runs_${getActiveRaceId()}`, JSON.stringify(v)); markDirty(); };
+const getRunsOf = id => {
+  const d = raceDateOf(id);
+  return JSON.parse(localStorage.getItem(`runs_${id}`) || '[]').map(r => normRun(r, d));
+};
+function getRuns() {
+  if (!isAllView()) return getRunsOf(getActiveRaceId());
+  const all = [];
+  allRaceIds().forEach(id => getRunsOf(id).forEach((r, i) => all.push({ ...r, _raceId: id, _idx: i })));
+  return all.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+}
+const setRuns = v => setRunsOf(getActiveRaceId(), v);
+const setRunsOf = (id, v) => {
+  // 読み込み時に足した legacyType は oldType として保存（前の種類のバッジの集計を保つ）
+  const out = v.map(r => {
+    const { legacyType, _raceId, _idx, ...rest } = r;
+    if (legacyType && !rest.oldType) rest.oldType = legacyType;
+    if (!rest.indoor) delete rest.indoor;
+    return rest;
+  });
+  localStorage.setItem(`runs_${id}`, JSON.stringify(out)); markDirty();
+};
 const getMS   = () => JSON.parse(localStorage.getItem(`ms_${getActiveRaceId()}`)   || '{}');
 const setMS   = v => { localStorage.setItem(`ms_${getActiveRaceId()}`,   JSON.stringify(v)); markDirty(); };
 
@@ -873,8 +1057,9 @@ function stationsToKm(v) { return v === 'full' ? 17 : parseInt(v) * STATION_KM; 
 const getPhaseIdx = () => {
   const stored = localStorage.getItem(`phaseIdx_${getActiveRaceId()}`);
   if (stored !== null) return parseInt(stored);
-  // Default: date-based
+  // Default: date-based（トレーニング開始日より前は Phase 1）
   const t = today();
+  if (PHASES.length && t < toDate(PHASES[0].start)) return 0;
   for (let i = 0; i < PHASES.length; i++) {
     if (t >= toDate(PHASES[i].start) && t <= toDate(PHASES[i].end)) return i;
   }
@@ -883,8 +1068,7 @@ const getPhaseIdx = () => {
 const savePhaseIdx = v => { localStorage.setItem(`phaseIdx_${getActiveRaceId()}`, v); markDirty(); };
 function getPhase() { return PHASES[getPhaseIdx()]; }
 
-// Phase progress based on actual runs
-const PHASE_TARGETS = [4, 10, 21, 30, 0, 0]; // km target per phase (0 = time-based)
+// Phase progress based on actual runs（段階ごとの目標距離 PHASE_TARGETS は applyRaceCfg() で距離に合わせて設定）
 function getPhaseRunProgress(phaseIdx) {
   const target = PHASE_TARGETS[phaseIdx];
   if (!target) return { pct: 100, label: '調整フェーズ', val: '' };
@@ -991,11 +1175,49 @@ function viewPhase(idx) {
 function render() {
   // Countdown
   const diff = Math.ceil((RACE_DATE - today()) / 86400000);
-  document.getElementById('countdownNum').textContent = Math.max(0, diff);
-
-  // Phase header badge
+  const raceDay = `${RACE_DATE.getMonth()+1}月${RACE_DATE.getDate()}日`;
+  const numEl = document.getElementById('countdownNum');
+  const lblEl = document.getElementById('headerCountdownLabel');
+  const phEl  = document.getElementById('headerPhase');
   const p = getPhase();
-  document.getElementById('headerPhase').textContent = `${p.name}：${p.sub}`;
+  const allView = isAllView();
+  // 「すべて」表示では、大会ごとの欄（練習の段階・目標ペース分析・マイルストーン・本番記録・抽選）を出さない
+  ['phaseCard', 'paceAnalysis', 'msList'].forEach(id => {
+    const e = document.getElementById(id);
+    const c = e && e.closest ? e.closest('.card') : null;
+    if (c) c.style.display = allView ? 'none' : '';
+  });
+  ['raceResultBanner', 'lotterySection'].forEach(id => {
+    const e = document.getElementById(id);
+    if (e) e.style.display = allView ? 'none' : '';
+  });
+  document.getElementById('headerRaceName').textContent = allView ? '📚 すべての記録（通算）' : '🏃 ' + getRaceCfg().name;
+  if (allView) {
+    const all = getRuns();
+    numEl.textContent = all.reduce((s, r) => s + (r.km || 0), 0).toFixed(1);
+    lblEl.textContent = 'km（全大会の合計）';
+    phEl.textContent  = `${getRaceList().length}大会・${all.length}回`;
+  } else if (diff < 0) {
+    // 大会が終わったあと：本番タイムがあれば「完走 4:23:59」
+    const result = getRaceResult();
+    if (result && result.finishTime) {
+      numEl.textContent = result.finishTime;
+      lblEl.textContent = `完走タイム（${raceDay}）`;
+      phEl.textContent  = '🏅 完走おめでとう！';
+    } else {
+      numEl.textContent = '🏁';
+      lblEl.textContent = `大会は終わりました（${raceDay}）`;
+      phEl.textContent  = '⚙ から本番タイムを記録できます';
+    }
+  } else if (diff === 0) {
+    numEl.textContent = '今日';
+    lblEl.textContent = `スタート！（${raceDay}）`;
+    phEl.textContent  = `${p.name}：${p.sub}`;
+  } else {
+    numEl.textContent = diff;
+    lblEl.textContent = `日後スタート（${raceDay}）`;
+    phEl.textContent  = `${p.name}：${p.sub}`;
+  }
 
   // Stats
   const runs = getRuns();
@@ -1012,14 +1234,17 @@ function render() {
   } else {
     rl.innerHTML = [...runs].reverse().map((r, ri) => {
       const idx = runs.length - 1 - ri;
-      const icon = r.type==='morning' ? '🌅' : r.type==='commute' ? '🏃' : r.type==='outdoor' ? '🌤️' : '🏋️';
-      const badgeClass = r.type==='outdoor' ? 'long' : r.type==='indoor' ? 'other' : '';
-      const badgeText = r.type==='morning' ? '朝ラン' : r.type==='commute' ? '通勤ラン' : r.type==='outdoor' ? '屋外ラン' : '屋内ラン';
+      const ti = TYPE_INFO[r.type] || TYPE_INFO.jog;
+      const icon = ti.icon;
+      const badgeClass = ti.cls;
+      const badgeText = ti.label;
       const stationInfo = '';
       const paceInfo = r.min ? fmtPace(r.km, r.min) + '/km' : '';
       const note = r.note ? ` · ${r.note}` : '';
       const displayPace = r.pace || (r.min ? fmtPace(r.km, r.min)+'/km' : '');
       const extras = [
+        r._raceId ? `🏁 ${raceNameOf(r._raceId)}` : '',
+        r.indoor ? '🏠 屋内' : '',
         displayPace ? `⏱ ${displayPace}` : '',
         r.hr   ? `❤️ ${r.hr}拍` : '',
         r.rpe  ? `💪 強度${r.rpe}` : '',
@@ -1039,7 +1264,7 @@ function render() {
 
   // Milestones
   const ms = getMS();
-  document.getElementById('msList').innerHTML = MILESTONES.map(m => `
+  document.getElementById('msList').innerHTML = ACTIVE_MS.map(m => `
     <div class="ms-item ${ms[m.id]?'done':''}" onclick="toggleMS('${m.id}')">
       <div class="ms-circle">${ms[m.id]?'✓':''}</div>
       <div class="ms-text">${m.text}</div>
@@ -1108,13 +1333,13 @@ function renderStats() {
   const weeklyAvg = mo.km / (elapsedDays / 7);
 
   // タイプ別（月間・累計）
-  const types = ['morning', 'commute', 'outdoor', 'indoor'];
+  const types = RUN_TYPES;
   const typeRow = (t, arr, maxKm) => {
     const s = sumStats(arr.filter(r => r.type === t));
     const pct = maxKm > 0 ? Math.round(s.km / maxKm * 100) : 0;
     return `<div class="stx-type-row">
       <div class="stx-type-dot" style="background:${TYPE_COLORS[t]}"></div>
-      <div class="stx-type-name">${TYPE_LABELS[t]}ラン</div>
+      <div class="stx-type-name">${TYPE_LABELS[t]}</div>
       <div class="stx-bar-bg"><div class="stx-bar-fill" style="width:${pct}%;background:${TYPE_COLORS[t]}"></div></div>
       <div class="stx-type-val">${s.km.toFixed(1)}km<span class="stx-type-sub">${s.count}回</span></div>
     </div>`;
@@ -1162,16 +1387,22 @@ function fmtYMD(d) {
 const BADGE_DEFS = [
   { id:'km',      name:'累計距離', unit:'km', icon:'🛣️', tiers:[10,25,50,75,100,150,200,250,300,400,500,600,700,800,900,1000], val:s=>s.km },
   { id:'runs',    name:'累計回数', unit:'回', icon:'👟', tiers:[5,10,20,30,45,60,80,100,125,150,200],                  val:s=>s.count },
-  { id:'morning', name:'朝ラン', unit:'回', icon:'🌅', tiers:[5,10,20,30,45,60,80,100],                              val:s=>s.morning },
-  { id:'commute', name:'通勤ラン', unit:'回', icon:'🏢', tiers:[5,10,20,30,45,60,80,100],                              val:s=>s.commute },
-  { id:'outdoor', name:'屋外ラン', unit:'回', icon:'🌿', tiers:[5,10,20,30,45,60,80,100],                              val:s=>s.outdoor },
-  { id:'indoor',  name:'屋内ラン', unit:'回', icon:'🏋️', tiers:[5,10,20,30,45,60,80,100],                              val:s=>s.indoor },
-  { id:'morningKm', name:'朝ラン距離', unit:'km', icon:'📏', tiers:[10,25,50,75,100,125,150,175,200,225,250,275,300],   val:s=>s.morningKm },
-  { id:'commuteKm', name:'通勤距離', unit:'km', icon:'🚏', tiers:[10,25,50,75,100,125,150,175,200,225,250,275,300],   val:s=>s.commuteKm },
-  { id:'outdoorKm', name:'屋外距離', unit:'km', icon:'🏞️', tiers:[10,25,50,75,100,150,200,250,300,350,400,450,500],  val:s=>s.outdoorKm },
-  { id:'indoorKm',  name:'屋内距離', unit:'km', icon:'🎽', tiers:[10,25,50,75,100,125,150,175,200,225,250,275,300],   val:s=>s.indoorKm },
+  { id:'jog',     name:'ジョグ', unit:'回', icon:'🏃', tiers:[5,10,20,30,45,60,80,100,125,150],                       val:s=>s.jog },
+  { id:'long',    name:'ロング走', unit:'回', icon:'🏔️', tiers:[1,3,5,10,15,20,30],                                   val:s=>s.long },
+  { id:'longKm',  name:'ロング走距離', unit:'km', icon:'🛤️', tiers:[25,50,100,150,200,300,400,500],                   val:s=>s.longKm },
+  { id:'speed',   name:'スピード練習', unit:'回', icon:'⚡', tiers:[1,3,5,10,20,30,50],                                val:s=>s.pace + s.interval },
+  { id:'race',    name:'レース', unit:'回', icon:'🏅', tiers:[1,2,3,5,10],                                             val:s=>s.race },
   { id:'streak',  name:'連続ラン', unit:'日', icon:'🔥', tiers:[2,3,4,5,7,10,14],                                      val:s=>s.bestStreak },
   { id:'month',   name:'月間距離', unit:'km', icon:'📅', tiers:[20,30,40,50,65,80,100,120,150],                        val:s=>s.bestMonthKm },
+  // ↓ 前の種類（2026-11-21まで）のバッジ。取ったものだけ表示し、これからは増えない（legacy）
+  { id:'morning', name:'朝ラン', unit:'回', icon:'🌅', tiers:[5,10,20,30,45,60,80,100],                              val:s=>s.morning, legacy:true },
+  { id:'commute', name:'通勤ラン', unit:'回', icon:'🏢', tiers:[5,10,20,30,45,60,80,100],                              val:s=>s.commute, legacy:true },
+  { id:'outdoor', name:'屋外ラン', unit:'回', icon:'🌿', tiers:[5,10,20,30,45,60,80,100],                              val:s=>s.outdoor, legacy:true },
+  { id:'indoor',  name:'屋内ラン', unit:'回', icon:'🏋️', tiers:[5,10,20,30,45,60,80,100],                              val:s=>s.indoor, legacy:true },
+  { id:'morningKm', name:'朝ラン距離', unit:'km', icon:'📏', tiers:[10,25,50,75,100,125,150,175,200,225,250,275,300],   val:s=>s.morningKm, legacy:true },
+  { id:'commuteKm', name:'通勤距離', unit:'km', icon:'🚏', tiers:[10,25,50,75,100,125,150,175,200,225,250,275,300],   val:s=>s.commuteKm, legacy:true },
+  { id:'outdoorKm', name:'屋外距離', unit:'km', icon:'🏞️', tiers:[10,25,50,75,100,150,200,250,300,350,400,450,500],  val:s=>s.outdoorKm, legacy:true },
+  { id:'indoorKm',  name:'屋内距離', unit:'km', icon:'🎽', tiers:[10,25,50,75,100,125,150,175,200,225,250,275,300],   val:s=>s.indoorKm, legacy:true },
 ];
 
 // 全大会のランをまとめて集計
@@ -1180,16 +1411,23 @@ function computeLifetimeStats() {
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
     if (k.startsWith('runs_')) {
-      try { all.push(...JSON.parse(localStorage.getItem(k) || '[]').map(normRun)); } catch(e) {}
+      const d = raceDateOf(k.slice(5));
+      try { all.push(...JSON.parse(localStorage.getItem(k) || '[]').map(r => normRun(r, d))); } catch(e) {}
     }
   }
-  const s = { km:0, count:all.length, morning:0, commute:0, outdoor:0, indoor:0,
+  const s = { km:0, count:all.length, jog:0, long:0, pace:0, interval:0, race:0, longKm:0,
+              morning:0, commute:0, outdoor:0, indoor:0,
               morningKm:0, commuteKm:0, outdoorKm:0, indoorKm:0, bestStreak:0, bestMonthKm:0 };
   const months = {};
   all.forEach(r => {
     s.km += r.km || 0;
     if (s[r.type] !== undefined) s[r.type]++;
-    if (s[r.type + 'Km'] !== undefined) s[r.type + 'Km'] += r.km || 0;
+    if (r.type === 'long') s.longKm += r.km || 0;
+    // 前の種類のバッジ用（前の種類で記録したものだけ）
+    if (r.legacyType && s[r.legacyType] !== undefined) {
+      s[r.legacyType]++;
+      s[r.legacyType + 'Km'] += r.km || 0;
+    }
     const ym = (r.date || '').slice(0, 7);
     if (ym) months[ym] = (months[ym] || 0) + (r.km || 0);
   });
@@ -1211,6 +1449,7 @@ function renderBadges() {
   el.innerHTML = BADGE_DEFS.map(def => {
     const v = def.val(s);
     const lv = def.tiers.filter(t => v >= t).length;
+    if (def.legacy && lv === 0) return ''; // 前の種類で取っていないバッジは出さない
     const next = def.tiers[lv];
     const maxed = lv === def.tiers.length;
     const pct = maxed ? 100 : Math.min(100, Math.round(v / next * 100));
@@ -1221,7 +1460,7 @@ function renderBadges() {
       <div class="badge-name">${def.name}</div>
       <div class="badge-lv">${lvLabel}</div>
       <div class="badge-prog-bg"><div class="badge-prog-fill" style="width:${pct}%"></div></div>
-      <div class="badge-sub">${disp}${def.unit}${maxed ? '・全レベル達成！' : ` / 次 ${next}${def.unit}`}</div>
+      <div class="badge-sub">${disp}${def.unit}${def.legacy ? '・前の種類の記録' : maxed ? '・全レベル達成！' : ` / 次 ${next}${def.unit}`}</div>
     </div>`;
   }).join('');
 }
@@ -1235,7 +1474,8 @@ function autoCheckAchievements() {
   const runs = getRuns();
   const ms = getMS();
   let msChanged = false;
-  MILESTONES.forEach(m => {
+  ACTIVE_MS.forEach(m => {
+    if (isAllView()) return; // 「すべて」表示では大会ごとのマイルストーンを判定しない
     if (!m.cond || ms[m.id] !== undefined) return;
     const hit = runs.some(r => {
       if (m.cond.dur  && !(r.min >= m.cond.dur)) return false;
@@ -1264,8 +1504,10 @@ function autoCheckAchievements() {
 
 let celebrateTimer = null;
 function showCelebration(items) {
+  const shown = items.length > 6 ? items.slice(0, 5) : items;
   document.getElementById('celebrateList').innerHTML =
-    items.map(i => `<div class="celebrate-item">${i.icon} ${i.text}</div>`).join('');
+    shown.map(i => `<div class="celebrate-item">${i.icon} ${i.text}</div>`).join('')
+    + (shown.length < items.length ? `<div class="celebrate-item">ほか ${items.length - shown.length} 件（バッジの画面で見られます）</div>` : '');
   document.getElementById('celebrateOverlay').classList.add('open');
   clearTimeout(celebrateTimer);
   celebrateTimer = setTimeout(closeCelebration, 8000);
@@ -1276,7 +1518,14 @@ function closeCelebration() {
 
 function delRun(i) {
   if (!confirm('この記録を削除しますか？')) return;
-  const r = getRuns(); r.splice(i,1); setRuns(r); refreshAll();
+  const r = getRuns();
+  if (isAllView()) {
+    const target = r[i];
+    const runs = getRunsOf(target._raceId); runs.splice(target._idx, 1); setRunsOf(target._raceId, runs);
+  } else {
+    r.splice(i,1); setRuns(r);
+  }
+  refreshAll();
 }
 function toggleMS(id) {
   const ms = getMS(); ms[id] = !ms[id]; setMS(ms); render();
@@ -1292,13 +1541,16 @@ function selectRPE(v) {
 }
 
 let editingIdx = null; // 編集中のrunインデックス（nullなら新規）
+let editingLegacy = null; // 編集中の記録の前の種類（前の種類のバッジの集計を保つため oldType として残す）
 
 function openModal() {
   editingIdx = null;
+  editingLegacy = null;
+  document.getElementById('fIndoor').checked = false;
   document.getElementById('modalTitle').textContent = 'ランを記録';
   document.getElementById('btnSave').textContent = '保存する';
   document.getElementById('fDate').value = new Date().toLocaleDateString('sv');
-  document.getElementById('fType').value = 'morning';
+  document.getElementById('fType').value = 'jog';
   document.getElementById('fDist').value = '';
   document.getElementById('fMin').value = '';
   document.getElementById('fPace').value = '';
@@ -1309,7 +1561,20 @@ function openModal() {
   document.getElementById('rpeLabel').textContent = 'タップして選択';
   document.querySelectorAll('.rpe-btn').forEach(b => b.classList.remove('sel'));
   onTypeChange();
+  updateRaceNote();
   document.getElementById('overlay').classList.add('open');
+}
+// 「すべて」表示のときだけ、記録がどの大会に入るかを表示
+function updateRaceNote() {
+  const el = document.getElementById('fRaceNote');
+  if (!el) return;
+  if (!isAllView()) { el.textContent = ''; return; }
+  if (editingIdx !== null) {
+    const cur = getRuns()[editingIdx];
+    el.textContent = cur ? `この記録は「${raceNameOf(cur._raceId)}」に入っています` : '';
+  } else {
+    el.textContent = `保存先：${raceNameOf(targetRaceFor(document.getElementById('fDate').value))}`;
+  }
 }
 
 function editRun(idx) {
@@ -1319,7 +1584,9 @@ function editRun(idx) {
   document.getElementById('modalTitle').textContent = '記録を編集';
   document.getElementById('btnSave').textContent = '更新する';
   document.getElementById('fDate').value = r.date;
-  document.getElementById('fType').value = r.type || 'commute';
+  document.getElementById('fType').value = RUN_TYPES.includes(r.type) ? r.type : 'jog';
+  document.getElementById('fIndoor').checked = !!r.indoor;
+  editingLegacy = r.legacyType || null;
   document.getElementById('fDist').value = r.km || '';
   // タイム：分+秒を "分.秒" 形式で表示
   if (r.min) {
@@ -1345,6 +1612,7 @@ function editRun(idx) {
   document.querySelectorAll('.rpe-btn').forEach(b => b.classList.toggle('sel', parseInt(b.dataset.v) === r.rpe));
   onTypeChange();
   onDistChange();
+  updateRaceNote();
   document.getElementById('overlay').classList.add('open');
 }
 
@@ -1358,11 +1626,8 @@ function onTypeChange() {
   const t = document.getElementById('fType').value;
   const hint = document.getElementById('stationHint');
   if (hint) hint.style.display = t === 'commute' ? 'block' : 'none';
-  document.getElementById('fDist').placeholder = t === 'indoor' ? '例: 3.0' : '例: 4.0';
-  // 屋内ランならメモに「トレッドミル」を自動入力
-  const noteEl = document.getElementById('fNote');
-  if (t === 'indoor' && !noteEl.value) noteEl.value = 'トレッドミル';
-  if (t !== 'indoor' && noteEl.value === 'トレッドミル') noteEl.value = '';
+  document.getElementById('fDist').placeholder =
+    { jog:'例: 4.0', long:'例: 15', pace:'例: 6', interval:'例: 5', race:'例: 10' }[t] || '例: 4.0';
   onDistChange();
 }
 // タイム入力パーサー：小数点以下を秒として解釈
@@ -1418,22 +1683,38 @@ function saveRun() {
   const hr   = parseInt(document.getElementById('fHR').value) || null;
   const rpe  = parseInt(document.getElementById('fRPE').value) || null;
 
-  const runs = getRuns();
+  const indoor = document.getElementById('fIndoor').checked;
   const entry = { date, type, km, min, pace, hr, rpe, note };
-  if (editingIdx !== null) {
-    runs[editingIdx] = entry; // 既存レコードを上書き
+  if (indoor) entry.indoor = true;
+  if (editingIdx !== null && editingLegacy) entry.oldType = editingLegacy;
+  if (isAllView()) {
+    // 「すべて」表示：編集はその記録の大会へ、新規は日付からいちばん近い大会へ
+    let id, runs;
+    if (editingIdx !== null) {
+      const cur = getRuns()[editingIdx];
+      id = cur._raceId; runs = getRunsOf(id); runs[cur._idx] = entry;
+    } else {
+      id = targetRaceFor(date); runs = getRunsOf(id); runs.push(entry);
+    }
+    runs.sort((a,b) => a.date.localeCompare(b.date));
+    setRunsOf(id, runs);
   } else {
-    runs.push(entry);         // 新規追加
+    const runs = getRuns();
+    if (editingIdx !== null) {
+      runs[editingIdx] = entry; // 既存レコードを上書き
+    } else {
+      runs.push(entry);         // 新規追加
+    }
+    runs.sort((a,b) => a.date.localeCompare(b.date));
+    setRuns(runs);
   }
-  runs.sort((a,b) => a.date.localeCompare(b.date));
-  setRuns(runs);
   closeModal();
   refreshAll();
 }
 
 // ── Weekly Progress ──────────────────────────────────────────
-const TYPE_COLORS = { morning:'#9C27B0', commute:'#0077B6', outdoor:'#4CAF50', indoor:'#FF9800' };
-const TYPE_LABELS = { morning:'朝', commute:'通勤', outdoor:'屋外', indoor:'屋内' };
+const TYPE_COLORS = Object.fromEntries(RUN_TYPES.map(k => [k, TYPE_INFO[k].color]));
+const TYPE_LABELS = Object.fromEntries(RUN_TYPES.map(k => [k, TYPE_INFO[k].label]));
 
 function renderWeekly() {
   const runs = getRuns();
@@ -1513,9 +1794,9 @@ function getMarathonFactor(km) {
   return 0.83;
 }
 
-// 距離による重み（フルマラソンに近いほど指数的に重くなる）
-function getDistanceWeight(km) {
-  const ratio = Math.min(km, 42.195) / 42.195;
+// 距離による重み（大会の距離に近いほど指数的に重くなる）
+function getDistanceWeight(km, raceKm = FULL_KM) {
+  const ratio = Math.min(km, raceKm) / raceKm;
   return Math.pow(ratio, 1.5); // 1km≈0.4%, 5km≈3%, 10km≈7%, 21km≈22%, 30km≈40%, 42km≈100%
 }
 
@@ -1532,6 +1813,8 @@ function getTimeWeight(dateStr) {
 function analyzePace() {
   const allRuns = getRuns().filter(r => r.min && r.km >= 1);
   if (!allRuns.length) return { status: 'none' };
+  const raceCfg = getRaceCfg();
+  const raceKm  = raceDistKm(raceCfg);
 
   // 90日以内のランのみ対象
   const recent = allRuns.filter(r => getTimeWeight(r.date) > 0);
@@ -1541,7 +1824,7 @@ function analyzePace() {
   let wSum = 0, wTotal = 0;
   recent.forEach(r => {
     const rawPace = r.min / r.km;
-    const distW = getDistanceWeight(r.km);
+    const distW = getDistanceWeight(r.km, raceKm);
     const timeW = getTimeWeight(r.date);
     const w = distW * timeW; // 長距離かつ直近ほど重視
     const estPace = rawPace * getMarathonFactor(r.km);
@@ -1550,20 +1833,26 @@ function analyzePace() {
   });
   const estMarathonPace = wTotal > 0 ? wSum / wTotal : recent[recent.length-1].min / recent[recent.length-1].km * 0.87;
 
-  // ロングランの数（精度表示用）
-  const longRuns = recent.filter(r => r.km >= 10);
+  // ロングランの数（精度表示用）。10kmの大会なら6km以上を「長め」とみなす
+  const longRuns = recent.filter(r => r.km >= Math.min(10, raceKm * 0.6));
 
-  // Finish time
-  const finishMin = estMarathonPace * 42.195;
+  // Finish time：推定マラソンペースを大会の距離に換算（フルはそのまま）
+  const finishMin = riegel(estMarathonPace * FULL_KM, FULL_KM, raceKm);
+  const estRacePace = finishMin / raceKm;
 
-  // Tier
-  const TIERS = [
-    { label:'サブ4圏内',   emoji:'🔥', color:'#C62828', maxPace: 240/42.195 },
-    { label:'サブ4:30圏内',emoji:'💪', color:'#E65100', maxPace: 270/42.195 },
-    { label:'サブ5圏内',   emoji:'👍', color:'#1565C0', maxPace: 300/42.195 },
-    { label:'サブ5へ向けて',emoji:'🏃', color:'#757575', maxPace: Infinity   },
+  // Tier：距離ごとの目標タイムの区切り（自由な距離は目標タイム基準）
+  const TIER_STYLE = [
+    { emoji:'🔥', color:'#C62828' }, { emoji:'💪', color:'#E65100' }, { emoji:'👍', color:'#1565C0' },
   ];
-  const tier = TIERS.find(t => estMarathonPace < t.maxPace);
+  const presets = goalPresetsFor(raceKm);
+  const btns = presets.length ? GOAL_BUTTONS[profileOf(raceKm)].map(min => presets.find(g => g.min === min)) : [];
+  const TIERS = btns.length
+    ? [...btns.map((g, i) => ({ label:`${g.label}圏内`, ...TIER_STYLE[i], maxPace: g.min / raceKm })),
+       { label:`${btns[btns.length-1].label}へ向けて`, emoji:'🏃', color:'#757575', maxPace: Infinity }]
+    : [{ label:'目標達成圏内',     ...TIER_STYLE[0], maxPace: raceCfg.goalMin / raceKm },
+       { label:'目標まであと少し', ...TIER_STYLE[1], maxPace: raceCfg.goalMin * 1.05 / raceKm },
+       { label:'目標へ向けて',     emoji:'🏃', color:'#757575', maxPace: Infinity }];
+  const tier = TIERS.find(t => estRacePace < t.maxPace);
 
   // Trend (compare older half vs newer half)
   let trend = null;
@@ -1593,9 +1882,10 @@ function analyzePace() {
     status: 'ok',
     dataCount: recent.length,
     longRunCount: longRuns.length,
-    finishTime: minToHHMM(finishMin),
+    finishTime: fmtGoalTime(finishMin),
     finishMin,
     estMarathonPace,
+    estRacePace, raceKm,
     tier, trend,
     easyLo, easyHi,
     indoorLo, indoorHi,
@@ -1631,7 +1921,7 @@ function renderPaceAnalysis() {
     ? '精度：高（ロング走データあり）'
     : a.longRunCount === 1
       ? '精度：中（ロング走1回）'
-      : '精度：低（朝ランのみ・参考値）';
+      : '精度：低（短い距離のみ・参考値）';
 
   el.innerHTML = `
     <div class="pa-top">
@@ -1643,19 +1933,19 @@ function renderPaceAnalysis() {
     </div>
     <div class="pa-rows">
       <div class="pa-row">
-        <span class="pa-lbl">目標マラソンペース</span>
-        <span class="pa-val">${paceToStr(a.estMarathonPace)} /km</span>
+        <span class="pa-lbl">${profileOf(a.raceKm) === 'full' ? '目標マラソンペース' : `予測の本番ペース（${distLabel(a.raceKm)}）`}</span>
+        <span class="pa-val">${paceToStr(a.estRacePace)} /km</span>
       </div>
       <div class="pa-row">
-        <span class="pa-lbl">朝ラン目安（Eペース）</span>
+        <span class="pa-lbl">ジョグ目安（Eペース）</span>
         <span class="pa-val">${paceToStr(a.commuteLo)}〜${paceToStr(a.commuteHi)} /km</span>
       </div>
       <div class="pa-row">
-        <span class="pa-lbl">屋外ロング目安</span>
+        <span class="pa-lbl">ロング走目安</span>
         <span class="pa-val">${paceToStr(a.easyLo)}〜${paceToStr(a.easyHi)} /km</span>
       </div>
       <div class="pa-row">
-        <span class="pa-lbl">屋内ラン目安（M〜T）</span>
+        <span class="pa-lbl">ペース走目安（M〜T）</span>
         <span class="pa-val">${paceToStr(a.indoorLo)}〜${paceToStr(a.indoorHi)} /km</span>
       </div>
       <div class="pa-row">
@@ -1906,13 +2196,6 @@ function importData() {
 // 目標タイムは大会設定（race_cfg.goalMin）に一本化
 const getGoal = () => getRaceCfg().goalMin;
 
-function goalLabelOf(goalMin) {
-  if (goalMin === 210) return 'サブ3:30';
-  if (goalMin === 240) return 'サブ4';
-  if (goalMin === 270) return 'サブ4:30';
-  if (goalMin === 300) return 'サブ5';
-  return `目標${minToHHMM(goalMin)}`;
-}
 
 function selectGoal(min) {
   const cfg = getRaceCfg();
@@ -1921,11 +2204,18 @@ function selectGoal(min) {
   refreshAll();
 }
 
+// 2026-11-22：ホームの「今週の練習メニュー提案」の欄は外した（陽平さん「ほとんど見なかった」）。
+// 欄が無いときは何もしない（戻すときは HTML に <div id="trainingPlan"> を足せばよい）
 function renderTrainingPlan() {
   const el = document.getElementById('trainingPlan');
+  if (!el) return;
   const goalMin = getGoal();
-  const goalPace = goalMin / 42.195; // min/km needed
-  const goalLabel = goalLabelOf(goalMin);
+  const raceKm = raceDistKm(getRaceCfg());
+  const prof = profileOf(raceKm);
+  const goalPace = goalMin / raceKm; // 本番の目標ペース（分/km）
+  // 練習ペースの基準：目標タイムをフルマラソン相当に換算したペース（フルはそのまま）
+  const goalMPace = riegel(goalMin, raceKm, FULL_KM) / FULL_KM;
+  const goalLabel = goalLabelOf(goalMin, raceKm);
 
   const t = today();
   const weeksLeft = Math.ceil((RACE_DATE - t) / (7 * 86400000));
@@ -1936,7 +2226,7 @@ function renderTrainingPlan() {
   // Gap section
   let gapHTML = '';
   if (a.status === 'ok') {
-    const gapSec = Math.round((a.estMarathonPace - goalPace) * 60);
+    const gapSec = Math.round((a.estRacePace - goalPace) * 60);
     if (gapSec <= 0) {
       const ahead = Math.abs(gapSec);
       gapHTML = `<div class="tp-gap" style="background:#E8F5E9">
@@ -1961,23 +2251,24 @@ function renderTrainingPlan() {
     }
   } else {
     gapHTML = `<div class="tp-gap" style="background:#f5f5f5">
-      <span class="tp-gap-lbl" style="color:#999">目標：${goalLabel}（${minToHHMM(goalMin)}）<br><small>3回記録するとギャップ分析が始まります</small></span>
+      <span class="tp-gap-lbl" style="color:#999">${goalLabel.startsWith('目標') ? goalLabel : `目標：${goalLabel}（${fmtGoalTime(goalMin)}）`}<br><small>3回記録するとギャップ分析が始まります</small></span>
     </div>`;
   }
 
   // Weekly menu based on phase
-  const menu = getWeeklyMenu(phaseIdx, weeksLeft, a, goalPace);
+  const menu = prof === 'full' ? getWeeklyMenu(phaseIdx, weeksLeft, a, goalMPace)
+             : prof === 'half' ? getWeeklyMenuHalf(phaseIdx, weeksLeft, goalMPace, goalPace)
+             :                   getWeeklyMenu10k(phaseIdx, weeksLeft, goalMPace, goalPace);
 
-  const goalBtns = [
-    {min:240, label:'サブ4'},
-    {min:270, label:'サブ4:30'},
-    {min:300, label:'サブ5'},
-  ].map(g => `<button class="tp-goal-btn${getGoal()===g.min?' active':''}" data-min="${g.min}" onclick="selectGoal(${g.min})">${g.label}</button>`).join('');
+  const presets = goalPresetsFor(raceKm);
+  const goalBtns = presets.length ? GOAL_BUTTONS[prof]
+    .map(min => presets.find(g => g.min === min))
+    .map(g => `<button class="tp-goal-btn${getGoal()===g.min?' active':''}" data-min="${g.min}" onclick="selectGoal(${g.min})">${g.label}</button>`).join('') : '';
 
   el.innerHTML = `
-    <div class="tp-goal-bar">${goalBtns}</div>
+    ${goalBtns ? `<div class="tp-goal-bar">${goalBtns}</div>` : ''}
     ${gapHTML}
-    <div class="tp-section-title">今週の推奨メニュー（残り${weeksLeft}週）</div>
+    <div class="tp-section-title">今週の推奨メニュー（残り${Math.max(0, weeksLeft)}週）</div>
     <div class="tp-menu">${menu.items.map(item => `
       <div class="tp-item">
         <div class="tp-item-icon">${item.icon}</div>
@@ -2078,6 +2369,81 @@ function getWeeklyMenu(phaseIdx, weeksLeft, a, goalPace) {
     ],
     advice: '目標は「30分間止まらず走れる体」。Eペース（RPE3〜4・隣の人と会話できる楽さ）を守ること。遅すぎると感じても、この強度が有酸素基盤を作ります。'
   };
+}
+
+// ── ハーフマラソン用の週メニュー ──────────────────────────────
+// mPace = 目標タイムのフルマラソン相当ペース（ゾーンの基準）、racePace = 本番の目標ペース
+function getWeeklyMenuHalf(phaseIdx, weeksLeft, mPace, racePace) {
+  const pr = (lo, hi) => `${paceToStr(Math.max(lo, 3.0))}〜${paceToStr(Math.max(hi, 3.5))}/km`;
+  const easyPace  = pr(mPace + 1.0, mPace + 1.5);
+  const longPace  = pr(mPace + 0.5, mPace + 0.83);
+  const tempoPace = pr(mPace - 0.25, mPace - 0.05);
+  const rp        = pr(racePace - 0.05, racePace + 0.05);
+  const E = { badgeColor:'#E3F2FD', badgeText:'#1565C0' }, Q = { badgeColor:'#FCE4EC', badgeText:'#C62828' },
+        G = { badgeColor:'#E8F5E9', badgeText:'#2E7D32' }, L = { badgeColor:'#F3E5F5', badgeText:'#7B1FA2' };
+  if (phaseIdx === 5 || weeksLeft <= 2) return { items: [
+      { icon:'🏃', title:'軽いジョグ × 2〜3回', detail:`3〜5km　${easyPace}（Eペース）`, badge:'テーパー', ...E },
+      { icon:'⚡', title:'目標ペースの刺激 × 1回', detail:`1km×2〜3本　${rp}`, badge:'少しだけ', ...G },
+      { icon:'😴', title:'睡眠・食事管理', detail:'本番2日前から炭水化物を多めに・装備・コース確認', badge:'最重要', badgeColor:'#FFF3E0', badgeText:'#E65100' },
+    ], advice: 'テーパー期。距離を減らして疲れを抜く時期です。速さは少しだけ残し、追い込まないこと。' };
+  if (phaseIdx === 4 || weeksLeft <= 4) return { items: [
+      { icon:'🚶', title:'朝ラン × 2〜3回', detail:`30分前後・約4km　${easyPace}（Eペース・回復走）`, badge:'回復', ...E },
+      { icon:'⚡', title:'目標ペース走 × 1回', detail:`8〜10km　${rp}　目標ペースで走り切る`, badge:'ペース確認', ...G },
+    ], advice: '目標ペースで8〜10kmを余裕を持って走れれば準備完了のサインです。睡眠・栄養を優先しましょう。' };
+  if (phaseIdx === 3) return { items: [
+      { icon:'🚶', title:'朝ラン × 2回', detail:`30分前後・約4km　${easyPace}（Eペース・回復走）`, badge:'回復走', ...E },
+      { icon:'⚡', title:'テンポ走 × 1回', detail:`20〜30分　${tempoPace}（Tペース）`, badge:'最重要', ...Q },
+      { icon:'🏔️', title:'ロング走 × 1回', detail:`16〜18km　${longPace}（ロング走ペース）　後半失速NG`, badge:'平日休み', ...L },
+    ], advice: 'テンポ走（きついが続けられる強度）とロング走の2本が柱。速い練習は週1回までにしましょう。' };
+  if (phaseIdx === 2) return { items: [
+      { icon:'🚶', title:'朝ラン × 2回', detail:`30分前後・約4km　${easyPace}（Eペース・回復走）`, badge:'回復走', ...E },
+      { icon:'🏃', title:'目標ペース走 × 1回', detail:`5〜8km　${pr(racePace, racePace + 0.15)}　本番ペースを体に覚えさせる`, badge:'ペース走', ...G },
+      { icon:'🏔️', title:'ロング走 × 1回', detail:`12〜15km　${longPace}（ロング走ペース）　ゆっくり長く`, badge:'平日休み', ...L },
+    ], advice: '毎週の走行距離は前週比+10%以内で。距離を増やす週に、速い練習を新しく足さないこと。' };
+  if (phaseIdx === 1) return { items: [
+      { icon:'🚶', title:'朝ラン × 2回', detail:`30分前後・約4km　${easyPace}（Eペース）　止まらず走る`, badge:'継続', ...E },
+      { icon:'🏃', title:'少し長めのラン × 1回', detail:`6〜10km　${easyPace}（Eペース）　毎回少しずつ距離アップ`, badge:'距離アップ', ...G },
+    ], advice: 'この段階はすべてEペース（会話できる楽さ）でOK。毎週の走行距離を前週比+10%以内で伸ばしましょう。' };
+  return { items: [
+      { icon:'🚶', title:'朝ラン（30分前後・約4km）× 2〜3回', detail:`${easyPace}（Eペース）　止まらず走る`, badge:'継続が大事', ...E },
+    ], advice: '目標は「30分間止まらず走れる体」。会話できる楽なペースを守ること。' };
+}
+
+// ── 10km用の週メニュー（健康・運動科の10km計画に合わせる） ───────────
+function getWeeklyMenu10k(phaseIdx, weeksLeft, mPace, racePace) {
+  const pr = (lo, hi) => `${paceToStr(Math.max(lo, 3.0))}〜${paceToStr(Math.max(hi, 3.2))}/km`;
+  const easyPace  = pr(mPace + 1.0, mPace + 1.5);
+  const longPace  = pr(mPace + 0.5, mPace + 0.83);
+  const tempoPace = pr(racePace + 0.17, racePace + 0.25); // 目標ペース＋10〜15秒
+  const rp        = pr(racePace - 0.08, racePace);          // 目標ペース〜5秒速く
+  const E = { badgeColor:'#E3F2FD', badgeText:'#1565C0' }, Q = { badgeColor:'#FCE4EC', badgeText:'#C62828' },
+        G = { badgeColor:'#E8F5E9', badgeText:'#2E7D32' }, L = { badgeColor:'#F3E5F5', badgeText:'#7B1FA2' };
+  if (phaseIdx === 5 || weeksLeft <= 2) return { items: [
+      { icon:'🏃', title:'軽いジョグ × 2〜3回', detail:`20〜30分　${easyPace}（Eペース）`, badge:'調整', ...E },
+      { icon:'⚡', title:'目標ペースの刺激 × 1回', detail:`1km×3本　${rp}（間は2〜3分ジョグ）`, badge:'少しだけ', ...G },
+    ], advice: '距離を3〜4割減らして疲れを抜く時期。速さは少しだけ残します。本番2日前からは休みか軽いジョグに。' };
+  if (phaseIdx === 4) return { items: [
+      { icon:'🚶', title:'朝ラン × 2回', detail:`30〜40分　${easyPace}（Eペース）`, badge:'ゆっくり', ...E },
+      { icon:'⚡', title:'最後の確かめ × 1回', detail:`目標ペースで6km（または4km×2本）　${rp}`, badge:'最重要', ...Q },
+    ], advice: '目標ペースで6kmが楽にできれば、本番の10kmは「練習で経験した負担の延長」になります。ここで本番のペースを決めましょう。' };
+  if (phaseIdx === 3) return { items: [
+      { icon:'🚶', title:'朝ラン × 2回', detail:`30〜40分　${easyPace}（Eペース）`, badge:'ゆっくり', ...E },
+      { icon:'⚡', title:'速い練習 × 1回', detail:`インターバル 1km×3〜5本 ${rp}／目標ペースで4km×2本`, badge:'最重要', ...Q },
+      { icon:'🏔️', title:'ゆっくりの長め × 1回', detail:`12〜14km　${longPace}`, badge:'平日休み', ...L },
+    ], advice: '速い練習は週1回まで。ウォームアップ（ゆっくり10〜15分＋流し）とクールダウンを必ず入れましょう。4週に1回は距離を2〜3割減らす週に。' };
+  if (phaseIdx === 2) return { items: [
+      { icon:'🚶', title:'朝ラン × 2回', detail:`30〜40分　${easyPace}（Eペース）`, badge:'ゆっくり', ...E },
+      { icon:'⚡', title:'速い練習 × 1回', detail:`テンポ走 15〜20分 ${tempoPace}／インターバル 1km×3本 ${rp}（交互に）`, badge:'最重要', ...Q },
+      { icon:'🏔️', title:'ゆっくりの長め × 1回', detail:`10〜12km　${longPace}`, badge:'平日休み', ...L },
+    ], advice: '練習の8割はゆっくりに。速い練習の次の日は休みかゆっくりにしましょう。' };
+  if (phaseIdx === 1) return { items: [
+      { icon:'🚶', title:'朝ラン × 2〜3回', detail:`30〜40分　${easyPace}（Eペース）`, badge:'ゆっくり', ...E },
+      { icon:'💨', title:'流し × 週1回', detail:'20秒だけ速く × 4〜6本（ゆっくりのランの最後に）', badge:'慣らし', ...G },
+      { icon:'🏃', title:'少し長めのラン × 1回', detail:`45〜60分（7〜9km）　${easyPace}`, badge:'平日休み', ...L },
+    ], advice: 'ゆっくりが中心。1週間の距離は前の週より1割まで。速さは流しで少しずつ慣らします。' };
+  return { items: [
+      { icon:'🚶', title:'ゆっくりラン × 3回（1日おき）', detail:'1分走って1分歩く → 連続30分へ　会話できるゆっくりの速さで（ペースは気にしない）', badge:'再開', ...E },
+    ], advice: '痛みが出たら、その週をもう一度くり返します（次の週に進まない）。全部ゆっくりで。' };
 }
 
 // ── Tab switching ───────────────────────────────────────────
@@ -2192,7 +2558,7 @@ function renderCalendar(year, month) {
     runMap[r.date].push(r);
   });
 
-  const TYPE_COLORS_CAL = { morning:'#9C27B0', commute:'#0077B6', outdoor:'#4CAF50', indoor:'#FF9800' };
+  const TYPE_COLORS_CAL = TYPE_COLORS;
   const todayStr = new Date().toLocaleDateString('sv');
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month + 1, 0);
@@ -2247,9 +2613,9 @@ function showDayDetail(dateStr) {
   const label = `${d.getMonth()+1}月${d.getDate()}日（${'日月火水木金土'[d.getDay()]}）`;
   document.getElementById('dayPopupDate').textContent = label;
 
-  const TYPE_LABELS = { morning:'朝ラン', commute:'通勤ラン', outdoor:'屋外ラン', indoor:'屋内ラン' };
-  const BADGE_CLS   = { morning:'', commute:'', outdoor:'other', indoor:'long' };
-  const TYPE_ICON   = { morning:'🌅', commute:'🏃', outdoor:'🌿', indoor:'🏋️' };
+  const TYPE_LABELS = Object.fromEntries(RUN_TYPES.map(k => [k, TYPE_INFO[k].label]));
+  const BADGE_CLS   = Object.fromEntries(RUN_TYPES.map(k => [k, TYPE_INFO[k].cls]));
+  const TYPE_ICON   = Object.fromEntries(RUN_TYPES.map(k => [k, TYPE_INFO[k].icon]));
 
   if (!runs.length) {
     document.getElementById('dayPopupContent').innerHTML =
@@ -2257,6 +2623,7 @@ function showDayDetail(dateStr) {
   } else {
     document.getElementById('dayPopupContent').innerHTML = runs.map(r => {
       const tags = [
+        r.indoor ? '🏠 屋内' : '',
         r.min  ? `⏱ ${fmtMin(r.min)}` : '',
         r.km   ? `📍 ${r.km.toFixed(1)} km` : '',
         (r.min && r.km) ? `🏃 ${fmtPace(r.km, r.min)}/km` : '',
@@ -2286,34 +2653,103 @@ function closeDayPopup(e) {
 function renderRaceChips() {
   const list = getRaceList();
   const activeId = getActiveRaceId();
-  document.getElementById('raceChips').innerHTML = list.map(r => {
+  const allView = isAllView();
+  document.getElementById('raceChips').innerHTML =
+    `<button class="race-chip ${allView ? 'active' : ''}" onclick="selectAllView()">📚 すべて（通算）</button>` +
+    list.map(r => {
     const isPast = r.date && new Date(r.date + 'T00:00:00') < today();
-    const cls = r.id === activeId ? 'active' : isPast ? 'past' : '';
-    const label = isPast ? r.name + ' ✓' : r.name;
+    const cls = (!allView && r.id === activeId) ? 'active' : isPast ? 'past' : '';
+    let km = FULL_KM;
+    try { km = raceDistKm(JSON.parse(localStorage.getItem(`race_cfg_${r.id}`) || '{}')); } catch(e) {}
+    const label = `${r.name}（${distLabel(km)}）${isPast ? ' ✓' : ''}`;
     return `<button class="race-chip ${cls}" onclick="switchRace('${r.id}')">${label}</button>`;
   }).join('');
 }
 
+// 「すべて（通算）」を選ぶ（この端末だけの表示の切りかえ）
+function selectAllView() {
+  localStorage.setItem(ALL_VIEW_KEY, '1');
+  renderRaceChips();
+  updateCfgFormVisibility();
+  refreshAll();
+}
+function updateCfgFormVisibility() {
+  const allView = isAllView();
+  const form = document.getElementById('raceCfgForm');
+  const note = document.getElementById('allViewNote');
+  if (form) form.style.display = allView ? 'none' : '';
+  if (note) note.style.display = allView ? 'block' : 'none';
+}
 function openSettings() {
   renderRaceChips();
+  updateCfgFormVisibility();
   const cfg = getRaceCfg();
   document.getElementById('sCfgName').value = cfg.name;
   document.getElementById('sCfgDate').value = cfg.date;
   document.getElementById('sCfgLottery').value = cfg.lotteryDate || '';
   document.getElementById('sCfgStart').value = cfg.startDate;
-  const preset = [210,240,270,300];
-  if (preset.includes(cfg.goalMin)) {
-    document.getElementById('sCfgGoalSel').value = String(cfg.goalMin);
-    document.getElementById('sCfgCustomWrap').style.display = 'none';
-  } else {
-    document.getElementById('sCfgGoalSel').value = '0';
-    document.getElementById('sCfgGoalMin').value = cfg.goalMin;
-    document.getElementById('sCfgCustomWrap').style.display = 'block';
-  }
+  fillDistGoalUI(cfg);
   const result = getRaceResult();
   document.getElementById('sCfgResult').value = result ? result.finishTime || '' : '';
   document.getElementById('sCfgResultNote').value = result ? result.note || '' : '';
   document.getElementById('settingsOverlay').classList.add('open');
+}
+// 距離の欄と目標タイムの欄を大会の設定で埋める
+function fillDistGoalUI(cfg) {
+  const km = raceDistKm(cfg);
+  const p = distPresetOf(km);
+  document.getElementById('sCfgDist').value = p ? p.key : 'custom';
+  document.getElementById('sCfgDistKm').value = p ? '' : km;
+  document.getElementById('sCfgDistKmWrap').style.display = p ? 'none' : 'block';
+  fillGoalUI(km, cfg.goalMin);
+}
+// 距離に合った目標タイムの選択肢を作り、goalMin を選ぶ（選択肢に無ければカスタム）
+function fillGoalUI(km, goalMin) {
+  const sel = document.getElementById('sCfgGoalSel');
+  const presets = goalPresetsFor(km);
+  sel.innerHTML = presets.map(g => `<option value="${g.min}">${g.label}（${fmtGoalTime(g.min).replace(/^(\d+):(\d+)$/, '$1時間$2分')}）</option>`).join('')
+    + '<option value="0">カスタム（分で入力）</option>';
+  sel.dataset.km = km;
+  const prof = profileOf(km);
+  document.getElementById('sCfgGoalMin').placeholder =
+    prof === '10k' ? '例: 48（=48分）' : prof === 'half' ? '例: 125（=2時間5分）' : '例: 255（=4時間15分）';
+  document.getElementById('sCfgResult').placeholder =
+    prof === '10k' ? '例: 47:30' : prof === 'half' ? '例: 1:58:20' : '例: 4:15:30';
+  if (presets.some(g => g.min === goalMin)) {
+    sel.value = String(goalMin);
+    document.getElementById('sCfgCustomWrap').style.display = 'none';
+  } else {
+    sel.value = '0';
+    document.getElementById('sCfgGoalMin').value = goalMin || '';
+    document.getElementById('sCfgCustomWrap').style.display = 'block';
+  }
+}
+// 設定欄で選ばれている距離（km）。自由な距離が未入力・不正なら null
+function readCfgDistKm() {
+  const key = document.getElementById('sCfgDist').value;
+  if (key !== 'custom') return DIST_PRESETS.find(p => p.key === key).km;
+  const v = parseFloat(document.getElementById('sCfgDistKm').value);
+  return v >= 1 && v <= 300 ? v : null;
+}
+function readCfgGoalMin(km) {
+  const sel = document.getElementById('sCfgGoalSel').value;
+  if (sel !== '0') return parseInt(sel);
+  return parseInt(document.getElementById('sCfgGoalMin').value) || null;
+}
+// 距離を変えたら、今の目標タイムを新しい距離に換算して選び直す
+function onCfgDistChange() {
+  const isCustom = document.getElementById('sCfgDist').value === 'custom';
+  document.getElementById('sCfgDistKmWrap').style.display = isCustom ? 'block' : 'none';
+  const newKm = readCfgDistKm();
+  if (!newKm) return;
+  const sel = document.getElementById('sCfgGoalSel');
+  const oldKm = parseFloat(sel.dataset.km) || FULL_KM;
+  if (Math.abs(oldKm - newKm) < 0.001) return;
+  const oldGoal = readCfgGoalMin(oldKm);
+  let goal = oldGoal ? Math.round(riegel(oldGoal, oldKm, newKm)) : GOAL_DEFAULT[profileOf(newKm)];
+  const near = goalPresetsFor(newKm).find(g => Math.abs(g.min - goal) <= 2);
+  if (near) goal = near.min;
+  fillGoalUI(newKm, goal);
 }
 function closeSettings(e) {
   if (e && e.target !== document.getElementById('settingsOverlay')) return;
@@ -2327,13 +2763,12 @@ function saveSettings() {
   const name  = document.getElementById('sCfgName').value.trim() || RACE_CFG_DEFAULT.name;
   const date  = document.getElementById('sCfgDate').value || RACE_CFG_DEFAULT.date;
   const start = document.getElementById('sCfgStart').value || RACE_CFG_DEFAULT.startDate;
-  const sel   = document.getElementById('sCfgGoalSel').value;
-  const goalMin = sel === '0'
-    ? (parseInt(document.getElementById('sCfgGoalMin').value) || 240)
-    : parseInt(sel);
+  const distanceKm = readCfgDistKm();
+  if (!distanceKm) { alert('距離（km）を 1〜300 の数字で入力してください'); return; }
+  const goalMin = readCfgGoalMin(distanceKm) || GOAL_DEFAULT[profileOf(distanceKm)];
   const lotteryDate = document.getElementById('sCfgLottery').value || '';
   // 既存の抽選結果などを保持したまま上書き
-  setRaceCfg({ ...getRaceCfg(), name, date, goalMin, startDate: start, lotteryDate });
+  setRaceCfg({ ...getRaceCfg(), name, date, distanceKm, goalMin, startDate: start, lotteryDate });
   applyRaceCfg();
   localStorage.removeItem(`phaseIdx_${getActiveRaceId()}`); // フェーズをリセット
   // 本番記録の保存
@@ -2353,26 +2788,20 @@ function saveSettings() {
 }
 
 function switchRace(id) {
+  localStorage.removeItem(ALL_VIEW_KEY); // 大会を選んだら「すべて」表示をやめる
   localStorage.setItem('active_race_id', id);
   markDirty();
   applyRaceCfg();
   localStorage.removeItem(`phaseIdx_${id}`); // 日付ベースで再計算
   renderRaceChips();
+  updateCfgFormVisibility();
   // 設定フィールドを新しい大会の設定で再描画
   const cfg = getRaceCfg();
   document.getElementById('sCfgName').value = cfg.name;
   document.getElementById('sCfgDate').value = cfg.date;
   document.getElementById('sCfgLottery').value = cfg.lotteryDate || '';
   document.getElementById('sCfgStart').value = cfg.startDate;
-  const preset = [210,240,270,300];
-  if (preset.includes(cfg.goalMin)) {
-    document.getElementById('sCfgGoalSel').value = String(cfg.goalMin);
-    document.getElementById('sCfgCustomWrap').style.display = 'none';
-  } else {
-    document.getElementById('sCfgGoalSel').value = '0';
-    document.getElementById('sCfgGoalMin').value = cfg.goalMin;
-    document.getElementById('sCfgCustomWrap').style.display = 'block';
-  }
+  fillDistGoalUI(cfg);
   const result = getRaceResult();
   document.getElementById('sCfgResult').value = result ? result.finishTime || '' : '';
   document.getElementById('sCfgResultNote').value = result ? result.note || '' : '';
@@ -2386,14 +2815,18 @@ function addNewRace() {
   if (!date) return;
   // ユニークIDを生成
   const id = 'race_' + Date.now();
+  // 大会名から距離を推測（「10km」「ハーフ」など）。違っていれば設定欄で選び直してもらう
+  const distanceKm = /10\s*(km|ｋｍ|k|キロ)/i.test(name) ? 10 : /ハーフ|half/i.test(name) ? HALF_KM : FULL_KM;
+  const goalMin = GOAL_DEFAULT[profileOf(distanceKm)];
   // 抽選日は大会ごとに異なるため引き継がない（設定から個別に入力）
-  const newCfg = { ...RACE_CFG_DEFAULT, name: name.trim(), date, startDate: new Date().toLocaleDateString('sv'), lotteryDate: '' };
+  const newCfg = { ...RACE_CFG_DEFAULT, name: name.trim(), date, distanceKm, goalMin, startDate: new Date().toLocaleDateString('sv'), lotteryDate: '' };
   localStorage.setItem(`race_cfg_${id}`, JSON.stringify(newCfg));
   const list = getRaceList();
   list.push({ id, name: name.trim(), date });
   setRaceList(list);
   markDirty();
   switchRace(id);
+  alert(`「${name.trim()}」を追加しました（距離：${distLabel(distanceKm)}・目標 ${goalLabelOf(goalMin, distanceKm)}）。\n距離・目標タイム・トレーニング開始日は、この画面の欄で変えられます。変えたら「保存する」を押してください。`);
 }
 
 function deleteRace() {
