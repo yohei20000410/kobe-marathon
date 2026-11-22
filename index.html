@@ -429,6 +429,7 @@ html, body {
     <div class="countdown-label" id="headerCountdownLabel">日後スタート（11月15日）</div>
     <div class="phase-badge" id="headerPhase">---</div>
     <div id="lotterySection"></div>
+    <div id="updateBanner"></div>
   </div>
 
   <!-- タブバー -->
@@ -638,6 +639,7 @@ html, body {
       <button onclick="closeShoeForm()" style="width:100%;padding:10px;background:none;color:#666;border:1px solid #ddd;border-radius:10px;font-size:0.85em;margin-top:8px">やめる</button>
     </div>
     <button id="shoeAddBtn" onclick="openShoeForm(null)" style="width:100%;padding:11px;background:#f0f4ff;color:#023E8A;border:1px dashed #023E8A;border-radius:10px;font-size:0.9em;font-weight:600;margin-top:10px">＋ 靴を追加</button>
+    <div style="text-align:center;font-size:0.72em;color:#aaa;margin-top:18px">アプリの版：<span id="appVersionLabel"></span></div>
   </div>
 </div>
 
@@ -3115,12 +3117,45 @@ function refreshAll() {
   if (newly.length) showCelebration(newly);
 }
 
+// ── アプリの版と、新しい版のお知らせ ─────────────────────────
+// 直して公開するたびに APP_VERSION を上げる（⚙ のいちばん下に表示）。
+// GitHub Pages は最大10分ほど古い版を返すことがあるため、起動時に最新のページを取りに行き、版が新しければ上にお知らせを出す
+const APP_VERSION = '2026-11-22.5';
+const APP_VERSION_NOTE = '靴のメーカー・色に対応';
+function showAppVersion() {
+  const el = document.getElementById('appVersionLabel');
+  if (el) el.textContent = `${APP_VERSION}（${APP_VERSION_NOTE}）`;
+}
+// 版の比べ方：数字ごとに比べる（'2026-11-22.10' は '2026-11-22.9' より新しい）
+function verCmp(a, b) {
+  const x = String(a).split(/[^0-9]+/).map(Number), y = String(b).split(/[^0-9]+/).map(Number);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; }
+  return 0;
+}
+async function checkAppUpdate() {
+  try {
+    const res = await fetch(location.pathname + '?v=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) return;
+    const m = (await res.text()).match(/const APP_VERSION = '([^']+)'/);
+    if (!m || verCmp(m[1], APP_VERSION) <= 0) return;
+    const el = document.getElementById('updateBanner');
+    if (el) el.innerHTML = `<button onclick="applyAppUpdate()" style="margin-top:8px;width:100%;padding:9px;background:#FFD60A;color:#023E8A;border:none;border-radius:10px;font-weight:700;font-size:0.85em">🔄 新しい版（${m[1]}）があります。タップで更新</button>`;
+  } catch (e) {}
+}
+async function applyAppUpdate() {
+  // ブラウザに残っている古いページを新しいものに入れかえてから読み直す
+  try { await fetch(location.pathname, { cache: 'reload' }); } catch (e) {}
+  location.reload();
+}
+
 migrateToMultiRace(); // 旧データ移行（初回のみ）
 applyRaceCfg();
 refreshAll();
 initSetup();
 renderSyncUI();
 if (getSyncToken()) syncNow(false); // 起動時にクラウドと同期
+showAppVersion();
+checkAppUpdate(); // 新しい版があれば上にお知らせ
 
 // 旧Service Workerを解除（オフラインキャッシュ廃止・同期方式に移行）
 if ('serviceWorker' in navigator) {
