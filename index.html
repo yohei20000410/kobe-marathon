@@ -605,8 +605,18 @@ html, body {
     <div id="shoeList"></div>
     <div id="shoeForm" style="display:none;background:#f7f9fc;border-radius:12px;padding:12px;margin-top:10px">
       <div class="fg" style="margin-bottom:10px">
-        <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">靴の名前</label>
-        <input type="text" id="shoeName" placeholder="例: ノヴァブラスト4" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
+        <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">メーカー（任意・候補から選ぶか入力）</label>
+        <input type="text" id="shoeBrand" list="shoeBrandList" placeholder="例: ミズノ" maxlength="20" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
+        <datalist id="shoeBrandList">
+          <option value="ミズノ"></option><option value="アシックス"></option><option value="ナイキ"></option>
+          <option value="ニューバランス"></option><option value="HOKA"></option><option value="アディダス"></option>
+          <option value="On"></option><option value="ブルックス"></option><option value="サッカニー"></option>
+          <option value="プーマ"></option><option value="アンダーアーマー"></option>
+        </datalist>
+      </div>
+      <div class="fg" style="margin-bottom:10px">
+        <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">名前（型）</label>
+        <input type="text" id="shoeName" placeholder="例: ウエーブライダー 30" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
       </div>
       <div class="fg" style="margin-bottom:10px">
         <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">色（任意・色違いの同じ型を見分けるため）</label>
@@ -1044,8 +1054,9 @@ const setShoes = v => { localStorage.setItem('shoes', JSON.stringify(v)); markDi
 const shoeById = id => getShoes().find(s => s.id === id) || null;
 // 名前の横に色を小さく（色は任意。HTML 用と、選択肢など文字だけの用）
 const escHTML = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const shoeNameHTML = s => escHTML(s.name) + (s.color ? ` <span style="font-size:0.78em;font-weight:400;color:#888">（${escHTML(s.color)}）</span>` : '');
-const shoeNameText = s => s.name + (s.color ? `（${s.color}）` : '');
+// 表示は「メーカー 名前（色）」。メーカー・色は空なら出さない
+const shoeNameHTML = s => escHTML((s.brand ? s.brand + ' ' : '') + s.name) + (s.color ? ` <span style="font-size:0.78em;font-weight:400;color:#888">（${escHTML(s.color)}）</span>` : '');
+const shoeNameText = s => (s.brand ? s.brand + ' ' : '') + s.name + (s.color ? `（${s.color}）` : '');
 function shoeOf(r) {
   if (r.shoe === 'none') return null;
   if (r.shoe) return r.shoe;
@@ -1125,6 +1136,7 @@ let editingShoeId = null;
 function openShoeForm(id) {
   editingShoeId = id;
   const s = id ? shoeById(id) : null;
+  document.getElementById('shoeBrand').value   = s ? (s.brand || '') : '';
   document.getElementById('shoeName').value    = s ? s.name : '';
   document.getElementById('shoeColor').value   = s ? (s.color || '') : '';
   document.getElementById('shoeStart').value   = s ? (s.start || '') : new Date().toLocaleDateString('sv');
@@ -1140,7 +1152,8 @@ function closeShoeForm() {
 }
 function saveShoe() {
   const name = document.getElementById('shoeName').value.trim();
-  if (!name) { alert('靴の名前を入れてください'); return; }
+  if (!name) { alert('靴の名前（型）を入れてください'); return; }
+  const brand   = document.getElementById('shoeBrand').value.trim();
   const color   = document.getElementById('shoeColor').value.trim();
   const start   = document.getElementById('shoeStart').value || '';
   const initKm  = Math.max(0, parseFloat(document.getElementById('shoeInitKm').value) || 0);
@@ -1148,10 +1161,10 @@ function saveShoe() {
   const shoes = getShoes();
   if (editingShoeId) {
     const s = shoes.find(x => x.id === editingShoeId);
-    if (s) Object.assign(s, { name, color, start, initKm, limitKm });
+    if (s) Object.assign(s, { brand, name, color, start, initKm, limitKm });
   } else {
     const id = 'shoe_' + Date.now();
-    shoes.push({ id, name, color, start, initKm, limitKm, retired:false });
+    shoes.push({ id, brand, name, color, start, initKm, limitKm, retired:false });
   }
   setShoes(shoes);
   closeShoeForm();
