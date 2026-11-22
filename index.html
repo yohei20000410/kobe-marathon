@@ -1049,11 +1049,13 @@ const raceDateOf = id => {
 // 記録の靴：r.shoe（靴のid、選ばないときは 'none'）。r.shoe が無い 2026-11-22 までの記録は、
 //   9/26 までを「前の靴」、9/27（新しい靴と中敷きの初回）からを「今の靴」として扱う（保存データは書き換えない）
 const SHOE_LIMIT_DEFAULT = 600;
+// 本番用の目安の初期値：陽平さんが自分で決めた見直しの目安（一般的な基準ではない。画面にも基準とは書かない）
+const SHOE_RACE_DEFAULT = 400;
 const SHOE_AUTO_SWITCH = '2026-09-27';
 const SHOE_AUTO_UNTIL  = '2026-11-22';
 const DEFAULT_SHOES = [
   { id:'shoe_old', name:'前の靴', start:'', initKm:0, limitKm:SHOE_LIMIT_DEFAULT, retired:true },
-  { id:'shoe_now', name:'今の靴', start:SHOE_AUTO_SWITCH, initKm:0, limitKm:SHOE_LIMIT_DEFAULT, retired:false },
+  { id:'shoe_now', name:'今の靴', start:SHOE_AUTO_SWITCH, initKm:0, limitKm:SHOE_LIMIT_DEFAULT, raceKm:SHOE_RACE_DEFAULT, race400:true, retired:false },
 ];
 // getShoesRaw：消した靴（deleted: true）も含めた保存どおりの一覧。書きかえるときはこちらを使う
 function getShoesRaw() {
@@ -1165,7 +1167,7 @@ function openShoeForm(id) {
   document.getElementById('shoeStart').value   = s ? (s.start || '') : new Date().toLocaleDateString('sv');
   document.getElementById('shoeInitKm').value  = s && s.initKm ? s.initKm : '';
   document.getElementById('shoeLimitKm').value = s ? (s.limitKm || SHOE_LIMIT_DEFAULT) : SHOE_LIMIT_DEFAULT;
-  document.getElementById('shoeRaceKm').value  = s && s.raceKm ? s.raceKm : '';
+  document.getElementById('shoeRaceKm').value  = s ? (s.raceKm || '') : SHOE_RACE_DEFAULT; // 新しい靴は 400km（空にもできる）
   document.getElementById('shoeDeleteBtn').style.display = s ? 'block' : 'none'; // 消すのは登録済みの靴だけ
   document.getElementById('shoeForm').style.display = 'block';
   document.getElementById('shoeAddBtn').style.display = 'none';
@@ -1191,7 +1193,7 @@ function saveShoe() {
     if (s) Object.assign(s, { brand, name, color, start, initKm, limitKm, raceKm, updatedAt: Date.now() });
   } else {
     const id = 'shoe_' + Date.now();
-    shoes.push({ id, brand, name, color, start, initKm, limitKm, raceKm, retired:false, updatedAt: Date.now() });
+    shoes.push({ id, brand, name, color, start, initKm, limitKm, raceKm, race400:true, retired:false, updatedAt: Date.now() });
   }
   setShoes(shoes);
   closeShoeForm();
@@ -3195,8 +3197,8 @@ function refreshAll() {
 // ── アプリの版と、新しい版のお知らせ ─────────────────────────
 // 直して公開するたびに APP_VERSION を上げる（⚙ のいちばん下に表示）。
 // GitHub Pages は最大10分ほど古い版を返すことがあるため、起動時に最新のページを取りに行き、版が新しければ上にお知らせを出す
-const APP_VERSION = '2026-11-23.1';
-const APP_VERSION_NOTE = '靴の消去・本番用の目安（目安の説明を見直し）';
+const APP_VERSION = '2026-11-23.2';
+const APP_VERSION_NOTE = '本番用の目安の初期値 400km';
 function showAppVersion() {
   const el = document.getElementById('appVersionLabel');
   if (el) el.textContent = `${APP_VERSION}（${APP_VERSION_NOTE}）`;
@@ -3237,7 +3239,23 @@ applyRaceCfg();
 refreshAll();
 initSetup();
 renderSyncUI();
-if (getSyncToken()) syncNow(false); // 起動時にクラウドと同期
+// 2026-11-23：本番用の目安が空の使用中の靴に、1回だけ 400km を入れる（陽平さんの希望）
+// 入れた靴には race400 の印を付け、そのあと陽平さんが空にしても、もう入れ直さない。
+// ほかの端末の新しい情報で上書きしないよう、同期で取りこんだあとに行う
+function applyShoeRaceDefaultOnce() {
+  const shoes = getShoesRaw();
+  if (!shoes.some(s => !s.deleted && !s.race400)) return;
+  shoes.forEach(s => {
+    if (s.deleted || s.race400) return;
+    if (!s.retired && !+s.raceKm) s.raceKm = SHOE_RACE_DEFAULT;
+    s.race400 = true;
+    s.updatedAt = Date.now();
+  });
+  setShoes(shoes);
+  renderShoes();
+}
+if (getSyncToken()) syncNow(false).finally(applyShoeRaceDefaultOnce); // 起動時にクラウドと同期
+else applyShoeRaceDefaultOnce();
 showAppVersion();
 checkAppUpdate(); // 新しい版があれば上にお知らせ
 
