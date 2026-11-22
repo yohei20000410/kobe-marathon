@@ -454,6 +454,10 @@ html, body {
         </div>
       </div>
       <div class="card">
+        <div class="card-title">👟 靴</div>
+        <div id="shoeHome"></div>
+      </div>
+      <div class="card">
         <div class="card-title">統計</div>
         <div id="statsView"></div>
       </div>
@@ -595,6 +599,31 @@ html, body {
     <button onclick="saveSettings()" style="width:100%;padding:14px;background:#023E8A;color:white;border:none;border-radius:12px;font-size:1em;font-weight:700">保存する</button>
     <button onclick="deleteRace()" style="width:100%;padding:11px;background:none;color:#C62828;border:1px solid #ffcdd2;border-radius:12px;font-size:0.85em;font-weight:600;margin-top:10px">🗑 この大会と記録をすべて削除</button>
     </div>
+    <div style="border-top:1px solid #f0f2f5;margin:20px 0 14px"></div>
+    <div style="font-size:0.95em;font-weight:700;color:#023E8A;margin-bottom:4px">👟 靴</div>
+    <div style="font-size:0.72em;color:#aaa;margin-bottom:10px">買い替えの目安（km）は靴やメーカーで違います（一般に500〜800kmほど）。目安の8割で「そろそろ」、超えたら「買い替えの目安」と知らせます。</div>
+    <div id="shoeList"></div>
+    <div id="shoeForm" style="display:none;background:#f7f9fc;border-radius:12px;padding:12px;margin-top:10px">
+      <div class="fg" style="margin-bottom:10px">
+        <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">靴の名前</label>
+        <input type="text" id="shoeName" placeholder="例: ノヴァブラスト4" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
+      </div>
+      <div class="fg" style="margin-bottom:10px">
+        <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">使い始めた日</label>
+        <input type="date" id="shoeStart" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
+      </div>
+      <div class="fg" style="margin-bottom:10px">
+        <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">はじめの距離（km・中古や途中から記録するとき）</label>
+        <input type="number" id="shoeInitKm" placeholder="0" min="0" step="0.1" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
+      </div>
+      <div class="fg" style="margin-bottom:12px">
+        <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">買い替えの目安（km）</label>
+        <input type="number" id="shoeLimitKm" placeholder="600" min="1" step="10" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
+      </div>
+      <button onclick="saveShoe()" style="width:100%;padding:12px;background:#023E8A;color:white;border:none;border-radius:10px;font-size:0.95em;font-weight:700">保存する</button>
+      <button onclick="closeShoeForm()" style="width:100%;padding:10px;background:none;color:#666;border:1px solid #ddd;border-radius:10px;font-size:0.85em;margin-top:8px">やめる</button>
+    </div>
+    <button id="shoeAddBtn" onclick="openShoeForm(null)" style="width:100%;padding:11px;background:#f0f4ff;color:#023E8A;border:1px dashed #023E8A;border-radius:10px;font-size:0.9em;font-weight:600;margin-top:10px">＋ 靴を追加</button>
   </div>
 </div>
 
@@ -639,6 +668,10 @@ html, body {
         <option value="race">レース（大会・タイムトライアル）</option>
       </select>
       <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-weight:400"><input type="checkbox" id="fIndoor" style="width:auto;margin:0"> 屋内（トレッドミル）</label>
+    </div>
+    <div class="fg">
+      <label>靴（任意）</label>
+      <select id="fShoe" onchange="shoeTouched = true"></select>
     </div>
     <div class="fg">
       <label>距離（km）</label>
@@ -987,6 +1020,163 @@ const raceDateOf = id => {
   catch(e) { return null; }
 };
 
+// ── 靴 ─────────────────────────────────────────────
+// 保存キー 'shoes'（同期する）：[{ id, name, start, initKm, limitKm, retired }]
+// まだ靴を登録・変更していないときは、仮の2足（前の靴・今の靴）を使う（保存はしない）
+// 記録の靴：r.shoe（靴のid、選ばないときは 'none'）。r.shoe が無い 2026-11-22 までの記録は、
+//   9/26 までを「前の靴」、9/27（新しい靴と中敷きの初回）からを「今の靴」として扱う（保存データは書き換えない）
+const SHOE_LIMIT_DEFAULT = 600;
+const SHOE_AUTO_SWITCH = '2026-09-27';
+const SHOE_AUTO_UNTIL  = '2026-11-22';
+const DEFAULT_SHOES = [
+  { id:'shoe_old', name:'前の靴', start:'', initKm:0, limitKm:SHOE_LIMIT_DEFAULT, retired:true },
+  { id:'shoe_now', name:'今の靴', start:SHOE_AUTO_SWITCH, initKm:0, limitKm:SHOE_LIMIT_DEFAULT, retired:false },
+];
+function getShoes() {
+  try { const v = JSON.parse(localStorage.getItem('shoes') || 'null'); if (Array.isArray(v)) return v; } catch(e) {}
+  return JSON.parse(JSON.stringify(DEFAULT_SHOES));
+}
+const setShoes = v => { localStorage.setItem('shoes', JSON.stringify(v)); markDirty(); };
+const shoeById = id => getShoes().find(s => s.id === id) || null;
+function shoeOf(r) {
+  if (r.shoe === 'none') return null;
+  if (r.shoe) return r.shoe;
+  if ((r.date || '') > SHOE_AUTO_UNTIL) return null;
+  const id = (r.date || '') < SHOE_AUTO_SWITCH ? 'shoe_old' : 'shoe_now';
+  return shoeById(id) ? id : null;
+}
+// 靴ごとの合計（全大会の記録を合わせて数える）
+// 靴は大会に結びつけず全大会で共通。内訳：種類別（byType）・大会別（byRace）
+function shoeStats() {
+  const st = {};
+  getShoes().forEach(s => { st[s.id] = { km: +s.initKm || 0, count: 0, byType: {}, byRace: {} }; });
+  allRaceIds().forEach(id => getRunsOf(id).forEach(r => {
+    const sid = shoeOf(r);
+    if (!sid || !st[sid]) return;
+    const x = st[sid];
+    x.km += r.km || 0; x.count++;
+    const ty = x.byType[r.type] || (x.byType[r.type] = { km:0, count:0 });
+    ty.km += r.km || 0; ty.count++;
+    const ra = x.byRace[id] || (x.byRace[id] = { km:0, count:0 });
+    ra.km += r.km || 0; ra.count++;
+  }));
+  return st;
+}
+function shoeBreakdownHTML(s, st) {
+  if (!st.count && !(+s.initKm)) return '';
+  const row = (label, v) => `<div style="display:flex;justify-content:space-between;padding:2px 0"><span>${label}</span><span>${v.km.toFixed(1)} km・${v.count}回</span></div>`;
+  const types = RUN_TYPES.filter(k => st.byType[k]).map(k => row(`${TYPE_INFO[k].icon} ${TYPE_INFO[k].label}`, st.byType[k])).join('');
+  const races = Object.keys(st.byRace).map(id => row(`🏁 ${raceNameOf(id)}`, st.byRace[id])).join('');
+  const init = +s.initKm ? row('はじめの距離', { km: +s.initKm, count: 0 }).replace('・0回', '') : '';
+  return `<details style="margin-top:6px;font-size:0.8em;color:#555">
+    <summary style="cursor:pointer;color:#023E8A">内訳を見る（種類・大会ごと）</summary>
+    <div style="margin-top:6px;font-weight:700;color:#888">種類ごと</div>${types || '<div>記録なし</div>'}
+    <div style="margin-top:6px;font-weight:700;color:#888">大会ごと</div>${races || '<div>記録なし</div>'}${init}
+  </details>`;
+}
+// 0：まだ大丈夫、1：そろそろ（目安の8割）、2：買い替えの目安を超えた
+function shoeLevel(shoe, km) {
+  const lim = +shoe.limitKm || SHOE_LIMIT_DEFAULT;
+  return km >= lim ? 2 : km >= lim * 0.8 ? 1 : 0;
+}
+function shoeRowHTML(s, st, withButtons) {
+  const lim = +s.limitKm || SHOE_LIMIT_DEFAULT;
+  const lv = shoeLevel(s, st.km);
+  const pct = Math.min(100, Math.round(st.km / lim * 100));
+  const color = lv === 2 ? '#C62828' : lv === 1 ? '#E65100' : '#2E7D32';
+  const msg = s.retired ? '引退' : lv === 2 ? '🔴 買い替えの目安です' : lv === 1 ? '🟡 そろそろ買い替えの目安' : '🟢 まだ大丈夫';
+  return `<div style="padding:10px 0;border-bottom:1px solid #f0f2f5;${s.retired ? 'opacity:0.55' : ''}">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
+      <div style="font-weight:700">${s.name}</div>
+      <div style="font-size:0.85em;color:${s.retired ? '#999' : color};font-weight:700">${msg}</div>
+    </div>
+    <div style="font-size:0.8em;color:#666;margin:4px 0">${st.km.toFixed(1)} km / 目安 ${lim} km・${st.count}回${s.start ? `・${s.start.slice(0,4)}/${+s.start.slice(5,7)}/${+s.start.slice(8,10)}〜` : ''}</div>
+    <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${s.retired ? '#bbb' : color}"></div></div>
+    ${shoeBreakdownHTML(s, st)}
+    ${withButtons ? `<div style="display:flex;gap:8px;margin-top:8px">
+      <button onclick="openShoeForm('${s.id}')" style="flex:1;padding:7px;background:#fff;border:1px solid #ddd;border-radius:8px;font-size:0.8em">✏️ 編集</button>
+      <button onclick="toggleShoeRetired('${s.id}')" style="flex:1;padding:7px;background:#fff;border:1px solid #ddd;border-radius:8px;font-size:0.8em">${s.retired ? '↩︎ 使用中に戻す' : '🏁 引退にする'}</button>
+    </div>` : ''}
+  </div>`;
+}
+// 使用中の靴を上、引退した靴を下に
+const sortedShoes = () => getShoes().slice().sort((a, b) => (a.retired ? 1 : 0) - (b.retired ? 1 : 0));
+function renderShoes() {
+  const st = shoeStats();
+  const home = document.getElementById('shoeHome');
+  if (home) {
+    const active = sortedShoes().filter(s => !s.retired);
+    home.innerHTML = active.length
+      ? active.map(s => shoeRowHTML(s, st[s.id], false)).join('') + '<div style="font-size:0.72em;color:#aaa;margin-top:6px">靴の登録・引退は ⚙ から</div>'
+      : '<div class="empty">⚙ から靴を登録すると、靴ごとの距離がわかります</div>';
+  }
+  const list = document.getElementById('shoeList');
+  if (list) list.innerHTML = sortedShoes().map(s => shoeRowHTML(s, st[s.id], true)).join('');
+}
+let editingShoeId = null;
+function openShoeForm(id) {
+  editingShoeId = id;
+  const s = id ? shoeById(id) : null;
+  document.getElementById('shoeName').value    = s ? s.name : '';
+  document.getElementById('shoeStart').value   = s ? (s.start || '') : new Date().toLocaleDateString('sv');
+  document.getElementById('shoeInitKm').value  = s && s.initKm ? s.initKm : '';
+  document.getElementById('shoeLimitKm').value = s ? (s.limitKm || SHOE_LIMIT_DEFAULT) : SHOE_LIMIT_DEFAULT;
+  document.getElementById('shoeForm').style.display = 'block';
+  document.getElementById('shoeAddBtn').style.display = 'none';
+}
+function closeShoeForm() {
+  editingShoeId = null;
+  document.getElementById('shoeForm').style.display = 'none';
+  document.getElementById('shoeAddBtn').style.display = 'block';
+}
+function saveShoe() {
+  const name = document.getElementById('shoeName').value.trim();
+  if (!name) { alert('靴の名前を入れてください'); return; }
+  const start   = document.getElementById('shoeStart').value || '';
+  const initKm  = Math.max(0, parseFloat(document.getElementById('shoeInitKm').value) || 0);
+  const limitKm = parseInt(document.getElementById('shoeLimitKm').value) || SHOE_LIMIT_DEFAULT;
+  const shoes = getShoes();
+  if (editingShoeId) {
+    const s = shoes.find(x => x.id === editingShoeId);
+    if (s) Object.assign(s, { name, start, initKm, limitKm });
+  } else {
+    const id = 'shoe_' + Date.now();
+    shoes.push({ id, name, start, initKm, limitKm, retired:false });
+  }
+  setShoes(shoes);
+  closeShoeForm();
+  renderShoes();
+}
+function toggleShoeRetired(id) {
+  const shoes = getShoes();
+  const s = shoes.find(x => x.id === id);
+  if (!s) return;
+  if (!s.retired && !confirm(`「${s.name}」を引退にしますか？\n（記録と距離は残ります。あとで戻すこともできます）`)) return;
+  s.retired = !s.retired;
+  setShoes(shoes);
+  renderShoes();
+}
+// 記録の入力画面の靴の選択肢（引退した靴は、編集中の記録で使っているときだけ出す）
+function fillShoeSelect(selectedId) {
+  const shoes = sortedShoes().filter(s => !s.retired || s.id === selectedId);
+  document.getElementById('fShoe').innerHTML =
+    shoes.map(s => `<option value="${s.id}">${s.name}${s.retired ? '（引退）' : ''}</option>`).join('')
+    + '<option value="none">選ばない</option>';
+  document.getElementById('fShoe').value = selectedId && shoes.some(s => s.id === selectedId) ? selectedId : 'none';
+}
+// 記録を足すときの靴の初期値：同じ種類で前回（いちばん新しい日付）使った靴。
+// その種類で初めてなら、最後に使った靴。どちらも無ければ使用中のいちばん上の靴（引退した靴は選ばない）
+function defaultShoeId(type) {
+  const active = new Set(getShoes().filter(s => !s.retired).map(s => s.id));
+  const runs = [];
+  allRaceIds().forEach(id => getRunsOf(id).forEach(r => runs.push(r)));
+  runs.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const pick = arr => { for (const r of arr) { const sid = shoeOf(r); if (sid && active.has(sid)) return sid; } return null; };
+  return pick(runs.filter(r => r.type === type)) || pick(runs)
+    || (sortedShoes().find(s => !s.retired) || {}).id || 'none';
+}
+let shoeTouched = false; // 入力画面で靴を自分で選んだら、種類を変えても靴を変えない
+
 // ── 「すべて（通算）」表示 ─────────────────────────────
 // この端末だけの表示の切りかえ（同期しない・保存データは書き換えない）。
 // 「すべて」のときは全大会の記録を日付順にまとめ、どの大会の記録か（_raceId と、その大会の中での位置 _idx）を持たせる
@@ -1242,8 +1432,10 @@ function render() {
       const paceInfo = r.min ? fmtPace(r.km, r.min) + '/km' : '';
       const note = r.note ? ` · ${r.note}` : '';
       const displayPace = r.pace || (r.min ? fmtPace(r.km, r.min)+'/km' : '');
+      const sh = shoeOf(r) ? shoeById(shoeOf(r)) : null;
       const extras = [
         r._raceId ? `🏁 ${raceNameOf(r._raceId)}` : '',
+        sh ? `👟 ${sh.name}` : '',
         r.indoor ? '🏠 屋内' : '',
         displayPace ? `⏱ ${displayPace}` : '',
         r.hr   ? `❤️ ${r.hr}拍` : '',
@@ -1547,6 +1739,8 @@ function openModal() {
   editingIdx = null;
   editingLegacy = null;
   document.getElementById('fIndoor').checked = false;
+  shoeTouched = false;
+  fillShoeSelect(defaultShoeId('jog')); // 初期値は同じ種類で前回使った靴
   document.getElementById('modalTitle').textContent = 'ランを記録';
   document.getElementById('btnSave').textContent = '保存する';
   document.getElementById('fDate').value = new Date().toLocaleDateString('sv');
@@ -1587,6 +1781,8 @@ function editRun(idx) {
   document.getElementById('fType').value = RUN_TYPES.includes(r.type) ? r.type : 'jog';
   document.getElementById('fIndoor').checked = !!r.indoor;
   editingLegacy = r.legacyType || null;
+  shoeTouched = true; // 編集のときは記録の靴のまま
+  fillShoeSelect(shoeOf(r));
   document.getElementById('fDist').value = r.km || '';
   // タイム：分+秒を "分.秒" 形式で表示
   if (r.min) {
@@ -1624,6 +1820,8 @@ function overlayClick(e) { if (e.target === document.getElementById('overlay')) 
 
 function onTypeChange() {
   const t = document.getElementById('fType').value;
+  // 新しく記録するときは、種類に合わせて靴の初期値を選び直す（自分で選んだあとは変えない）
+  if (editingIdx === null && !shoeTouched && document.getElementById('fShoe')) fillShoeSelect(defaultShoeId(t));
   const hint = document.getElementById('stationHint');
   if (hint) hint.style.display = t === 'commute' ? 'block' : 'none';
   document.getElementById('fDist').placeholder =
@@ -1684,7 +1882,10 @@ function saveRun() {
   const rpe  = parseInt(document.getElementById('fRPE').value) || null;
 
   const indoor = document.getElementById('fIndoor').checked;
-  const entry = { date, type, km, min, pace, hr, rpe, note };
+  const shoe = document.getElementById('fShoe').value || 'none';
+  const shoeObj = shoe !== 'none' ? shoeById(shoe) : null;
+  const shoeKmBefore = shoeObj ? shoeStats()[shoe].km : 0;
+  const entry = { date, type, km, min, pace, hr, rpe, note, shoe };
   if (indoor) entry.indoor = true;
   if (editingIdx !== null && editingLegacy) entry.oldType = editingLegacy;
   if (isAllView()) {
@@ -1710,6 +1911,17 @@ function saveRun() {
   }
   closeModal();
   refreshAll();
+  // 靴：目安の8割・目安を超えたときに一度だけ知らせる
+  if (shoeObj && !shoeObj.retired) {
+    const before = shoeLevel(shoeObj, shoeKmBefore);
+    const kmNow = shoeStats()[shoe].km;
+    const after = shoeLevel(shoeObj, kmNow);
+    if (after > before) {
+      alert(after === 2
+        ? `👟「${shoeObj.name}」が買い替えの目安（${shoeObj.limitKm || SHOE_LIMIT_DEFAULT}km）を超えました（${kmNow.toFixed(1)}km）。\n足や膝に違和感があれば、早めの買い替えを考えましょう。`
+        : `👟「${shoeObj.name}」がそろそろ買い替えの目安です（${kmNow.toFixed(1)}km / 目安 ${shoeObj.limitKm || SHOE_LIMIT_DEFAULT}km）。`);
+    }
+  }
 }
 
 // ── Weekly Progress ──────────────────────────────────────────
@@ -1975,7 +2187,7 @@ function initSetup() {
 
 // ── 全データの収集・適用（バックアップと同期の共通処理）──
 const APP_KEY_PREFIXES = ['runs_','ms_','race_cfg_','goal_','phaseIdx_','race_result_'];
-const APP_KEY_SINGLES  = ['race_list','active_race_id','setup_done','badges_seen'];
+const APP_KEY_SINGLES  = ['race_list','active_race_id','setup_done','badges_seen','shoes'];
 
 function collectAllData() {
   const data = {
@@ -2622,7 +2834,9 @@ function showDayDetail(dateStr) {
       `<div class="day-popup-empty">この日の記録はありません</div>`;
   } else {
     document.getElementById('dayPopupContent').innerHTML = runs.map(r => {
+      const sh = shoeOf(r) ? shoeById(shoeOf(r)) : null;
       const tags = [
+        sh ? `👟 ${sh.name}` : '',
         r.indoor ? '🏠 屋内' : '',
         r.min  ? `⏱ ${fmtMin(r.min)}` : '',
         r.km   ? `📍 ${r.km.toFixed(1)} km` : '',
@@ -2683,6 +2897,8 @@ function updateCfgFormVisibility() {
 function openSettings() {
   renderRaceChips();
   updateCfgFormVisibility();
+  closeShoeForm();
+  renderShoes();
   const cfg = getRaceCfg();
   document.getElementById('sCfgName').value = cfg.name;
   document.getElementById('sCfgDate').value = cfg.date;
@@ -2863,6 +3079,7 @@ function migrateToMultiRace() {
 function refreshAll() {
   const newly = autoCheckAchievements(); // マイルストーン自動チェック＆バッジ判定
   render();
+  renderShoes();
   renderStats();
   renderBadges();
   renderResultBanner();
