@@ -609,6 +609,10 @@ html, body {
         <input type="text" id="shoeName" placeholder="例: ノヴァブラスト4" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
       </div>
       <div class="fg" style="margin-bottom:10px">
+        <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">色（任意・色違いの同じ型を見分けるため）</label>
+        <input type="text" id="shoeColor" placeholder="例: 白×水色" maxlength="20" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
+      </div>
+      <div class="fg" style="margin-bottom:10px">
         <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">使い始めた日</label>
         <input type="date" id="shoeStart" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
       </div>
@@ -1038,6 +1042,10 @@ function getShoes() {
 }
 const setShoes = v => { localStorage.setItem('shoes', JSON.stringify(v)); markDirty(); };
 const shoeById = id => getShoes().find(s => s.id === id) || null;
+// 名前の横に色を小さく（色は任意。HTML 用と、選択肢など文字だけの用）
+const escHTML = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const shoeNameHTML = s => escHTML(s.name) + (s.color ? ` <span style="font-size:0.78em;font-weight:400;color:#888">（${escHTML(s.color)}）</span>` : '');
+const shoeNameText = s => s.name + (s.color ? `（${s.color}）` : '');
 function shoeOf(r) {
   if (r.shoe === 'none') return null;
   if (r.shoe) return r.shoe;
@@ -1087,7 +1095,7 @@ function shoeRowHTML(s, st, withButtons) {
   const msg = s.retired ? '引退' : lv === 2 ? '🔴 買い替えの目安です' : lv === 1 ? '🟡 そろそろ買い替えの目安' : '🟢 まだ大丈夫';
   return `<div style="padding:10px 0;border-bottom:1px solid #f0f2f5;${s.retired ? 'opacity:0.55' : ''}">
     <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
-      <div style="font-weight:700">${s.name}</div>
+      <div style="font-weight:700">${shoeNameHTML(s)}</div>
       <div style="font-size:0.85em;color:${s.retired ? '#999' : color};font-weight:700">${msg}</div>
     </div>
     <div style="font-size:0.8em;color:#666;margin:4px 0">${st.km.toFixed(1)} km / 目安 ${lim} km・${st.count}回${s.start ? `・${s.start.slice(0,4)}/${+s.start.slice(5,7)}/${+s.start.slice(8,10)}〜` : ''}</div>
@@ -1118,6 +1126,7 @@ function openShoeForm(id) {
   editingShoeId = id;
   const s = id ? shoeById(id) : null;
   document.getElementById('shoeName').value    = s ? s.name : '';
+  document.getElementById('shoeColor').value   = s ? (s.color || '') : '';
   document.getElementById('shoeStart').value   = s ? (s.start || '') : new Date().toLocaleDateString('sv');
   document.getElementById('shoeInitKm').value  = s && s.initKm ? s.initKm : '';
   document.getElementById('shoeLimitKm').value = s ? (s.limitKm || SHOE_LIMIT_DEFAULT) : SHOE_LIMIT_DEFAULT;
@@ -1132,16 +1141,17 @@ function closeShoeForm() {
 function saveShoe() {
   const name = document.getElementById('shoeName').value.trim();
   if (!name) { alert('靴の名前を入れてください'); return; }
+  const color   = document.getElementById('shoeColor').value.trim();
   const start   = document.getElementById('shoeStart').value || '';
   const initKm  = Math.max(0, parseFloat(document.getElementById('shoeInitKm').value) || 0);
   const limitKm = parseInt(document.getElementById('shoeLimitKm').value) || SHOE_LIMIT_DEFAULT;
   const shoes = getShoes();
   if (editingShoeId) {
     const s = shoes.find(x => x.id === editingShoeId);
-    if (s) Object.assign(s, { name, start, initKm, limitKm });
+    if (s) Object.assign(s, { name, color, start, initKm, limitKm });
   } else {
     const id = 'shoe_' + Date.now();
-    shoes.push({ id, name, start, initKm, limitKm, retired:false });
+    shoes.push({ id, name, color, start, initKm, limitKm, retired:false });
   }
   setShoes(shoes);
   closeShoeForm();
@@ -1151,7 +1161,7 @@ function toggleShoeRetired(id) {
   const shoes = getShoes();
   const s = shoes.find(x => x.id === id);
   if (!s) return;
-  if (!s.retired && !confirm(`「${s.name}」を引退にしますか？\n（記録と距離は残ります。あとで戻すこともできます）`)) return;
+  if (!s.retired && !confirm(`「${shoeNameText(s)}」を引退にしますか？\n（記録と距離は残ります。あとで戻すこともできます）`)) return;
   s.retired = !s.retired;
   setShoes(shoes);
   renderShoes();
@@ -1160,7 +1170,7 @@ function toggleShoeRetired(id) {
 function fillShoeSelect(selectedId) {
   const shoes = sortedShoes().filter(s => !s.retired || s.id === selectedId);
   document.getElementById('fShoe').innerHTML =
-    shoes.map(s => `<option value="${s.id}">${s.name}${s.retired ? '（引退）' : ''}</option>`).join('')
+    shoes.map(s => `<option value="${s.id}">${escHTML(shoeNameText(s))}${s.retired ? '（引退）' : ''}</option>`).join('')
     + '<option value="none">選ばない</option>';
   document.getElementById('fShoe').value = selectedId && shoes.some(s => s.id === selectedId) ? selectedId : 'none';
 }
@@ -1435,7 +1445,7 @@ function render() {
       const sh = shoeOf(r) ? shoeById(shoeOf(r)) : null;
       const extras = [
         r._raceId ? `🏁 ${raceNameOf(r._raceId)}` : '',
-        sh ? `👟 ${sh.name}` : '',
+        sh ? `👟 ${escHTML(shoeNameText(sh))}` : '',
         r.indoor ? '🏠 屋内' : '',
         displayPace ? `⏱ ${displayPace}` : '',
         r.hr   ? `❤️ ${r.hr}拍` : '',
@@ -1918,8 +1928,8 @@ function saveRun() {
     const after = shoeLevel(shoeObj, kmNow);
     if (after > before) {
       alert(after === 2
-        ? `👟「${shoeObj.name}」が買い替えの目安（${shoeObj.limitKm || SHOE_LIMIT_DEFAULT}km）を超えました（${kmNow.toFixed(1)}km）。\n足や膝に違和感があれば、早めの買い替えを考えましょう。`
-        : `👟「${shoeObj.name}」がそろそろ買い替えの目安です（${kmNow.toFixed(1)}km / 目安 ${shoeObj.limitKm || SHOE_LIMIT_DEFAULT}km）。`);
+        ? `👟「${shoeNameText(shoeObj)}」が買い替えの目安（${shoeObj.limitKm || SHOE_LIMIT_DEFAULT}km）を超えました（${kmNow.toFixed(1)}km）。\n足や膝に違和感があれば、早めの買い替えを考えましょう。`
+        : `👟「${shoeNameText(shoeObj)}」がそろそろ買い替えの目安です（${kmNow.toFixed(1)}km / 目安 ${shoeObj.limitKm || SHOE_LIMIT_DEFAULT}km）。`);
     }
   }
 }
@@ -2836,7 +2846,7 @@ function showDayDetail(dateStr) {
     document.getElementById('dayPopupContent').innerHTML = runs.map(r => {
       const sh = shoeOf(r) ? shoeById(shoeOf(r)) : null;
       const tags = [
-        sh ? `👟 ${sh.name}` : '',
+        sh ? `👟 ${escHTML(shoeNameText(sh))}` : '',
         r.indoor ? '🏠 屋内' : '',
         r.min  ? `⏱ ${fmtMin(r.min)}` : '',
         r.km   ? `📍 ${r.km.toFixed(1)} km` : '',
