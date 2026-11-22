@@ -604,7 +604,7 @@ html, body {
     </div>
     <div style="border-top:1px solid #f0f2f5;margin:20px 0 14px"></div>
     <div style="font-size:0.95em;font-weight:700;color:#023E8A;margin-bottom:4px">👟 靴</div>
-    <div style="font-size:0.72em;color:#aaa;margin-bottom:10px">買い替えの目安（km）は靴やメーカーで違います（一般に500〜800kmほど）。目安の8割で「そろそろ」、超えたら「買い替えの目安」と知らせます。</div>
+    <div style="font-size:0.72em;color:#aaa;margin-bottom:10px">目安は靴やメーカーで違います（よく言われるのは、本番用は200〜400kmほど、買い替えは500〜800kmほど）。本番用の目安を入れると「🏁 本番OK → 🏃 練習用」と分けて表示し、買い替えの目安の8割で「そろそろ」、超えたら「買い替えの目安」と知らせます。</div>
     <div id="shoeList"></div>
     <div id="shoeForm" style="display:none;background:#f7f9fc;border-radius:12px;padding:12px;margin-top:10px">
       <div class="fg" style="margin-bottom:10px">
@@ -633,12 +633,17 @@ html, body {
         <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">はじめの距離（km・中古や途中から記録するとき）</label>
         <input type="number" id="shoeInitKm" placeholder="0" min="0" step="0.1" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
       </div>
+      <div class="fg" style="margin-bottom:10px">
+        <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">本番用の目安（km・任意。ここまでは本番に使える）</label>
+        <input type="number" id="shoeRaceKm" placeholder="例: 300（空なら使わない）" min="1" step="10" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
+      </div>
       <div class="fg" style="margin-bottom:12px">
-        <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">買い替えの目安（km）</label>
+        <label style="font-size:0.8em;color:#888;display:block;margin-bottom:4px">買い替え（練習用）の目安（km）</label>
         <input type="number" id="shoeLimitKm" placeholder="600" min="1" step="10" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:0.95em">
       </div>
       <button onclick="saveShoe()" style="width:100%;padding:12px;background:#023E8A;color:white;border:none;border-radius:10px;font-size:0.95em;font-weight:700">保存する</button>
       <button onclick="closeShoeForm()" style="width:100%;padding:10px;background:none;color:#666;border:1px solid #ddd;border-radius:10px;font-size:0.85em;margin-top:8px">やめる</button>
+      <button id="shoeDeleteBtn" onclick="deleteShoe()" style="width:100%;padding:10px;background:none;color:#C62828;border:1px solid #ffcdd2;border-radius:10px;font-size:0.85em;font-weight:600;margin-top:14px">🗑 この靴を消す</button>
     </div>
     <button id="shoeAddBtn" onclick="openShoeForm(null)" style="width:100%;padding:11px;background:#f0f4ff;color:#023E8A;border:1px dashed #023E8A;border-radius:10px;font-size:0.9em;font-weight:600;margin-top:10px">＋ 靴を追加</button>
     <div style="text-align:center;font-size:0.72em;color:#aaa;margin-top:18px">アプリの版：<span id="appVersionLabel"></span></div>
@@ -1050,10 +1055,13 @@ const DEFAULT_SHOES = [
   { id:'shoe_old', name:'前の靴', start:'', initKm:0, limitKm:SHOE_LIMIT_DEFAULT, retired:true },
   { id:'shoe_now', name:'今の靴', start:SHOE_AUTO_SWITCH, initKm:0, limitKm:SHOE_LIMIT_DEFAULT, retired:false },
 ];
-function getShoes() {
+// getShoesRaw：消した靴（deleted: true）も含めた保存どおりの一覧。書きかえるときはこちらを使う
+function getShoesRaw() {
   try { const v = JSON.parse(localStorage.getItem('shoes') || 'null'); if (Array.isArray(v)) return v; } catch(e) {}
   return JSON.parse(JSON.stringify(DEFAULT_SHOES));
 }
+// getShoes：消した靴を除いた一覧（表示・集計用）。消した靴で走った記録は「靴なし」として扱う（記録そのものは書きかえない）
+const getShoes = () => getShoesRaw().filter(s => !s.deleted);
 const setShoes = v => { localStorage.setItem('shoes', JSON.stringify(v)); markDirty(); };
 const shoeById = id => getShoes().find(s => s.id === id) || null;
 // 名前の横に色を小さく（色は任意。HTML 用と、選択肢など文字だけの用）
@@ -1102,19 +1110,30 @@ function shoeLevel(shoe, km) {
   const lim = +shoe.limitKm || SHOE_LIMIT_DEFAULT;
   return km >= lim ? 2 : km >= lim * 0.8 ? 1 : 0;
 }
+// 段階（本番用の目安があるとき）：本番OK → 練習用 → そろそろ買い替え → 買い替えの目安
+// 本番用の目安が空なら：まだ大丈夫 → そろそろ → 買い替えの目安（今までどおり）
+function shoeStage(shoe, km) {
+  const lv = shoeLevel(shoe, km);
+  const raceKm = +shoe.raceKm || 0;
+  if (lv === 2) return { rank:3, key:'over',  label:'🔴 買い替えの目安', short:'🔴買い替え', color:'#C62828' };
+  if (lv === 1) return { rank:2, key:'soon',  label:'🟡 そろそろ買い替え', short:'🟡そろそろ', color:'#E65100' };
+  if (raceKm && km < raceKm) return { rank:0, key:'race', label:'🏁 本番OK', short:'🏁本番OK', color:'#1565C0' };
+  if (raceKm) return { rank:1, key:'practice', label:'🏃 練習用', short:'🏃練習用', color:'#2E7D32' };
+  return { rank:0, key:'ok', label:'🟢 まだ大丈夫', short:'🟢', color:'#2E7D32' };
+}
 function shoeRowHTML(s, st, withButtons) {
   const lim = +s.limitKm || SHOE_LIMIT_DEFAULT;
-  const lv = shoeLevel(s, st.km);
+  const stage = shoeStage(s, st.km);
   const pct = Math.min(100, Math.round(st.km / lim * 100));
-  const color = lv === 2 ? '#C62828' : lv === 1 ? '#E65100' : '#2E7D32';
-  const msg = s.retired ? '引退' : lv === 2 ? '🔴 買い替えの目安です' : lv === 1 ? '🟡 そろそろ買い替えの目安' : '🟢 まだ大丈夫';
+  const color = stage.color;
+  const msg = s.retired ? '引退' : stage.label;
   return `<div style="padding:10px 0;border-bottom:1px solid #f0f2f5;${s.retired ? 'opacity:0.55' : ''}">
     <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
       <div style="font-weight:700">${shoeNameHTML(s)}</div>
       <div style="font-size:0.85em;color:${s.retired ? '#999' : color};font-weight:700">${msg}</div>
     </div>
-    <div style="font-size:0.8em;color:#666;margin:4px 0">${st.km.toFixed(1)} km / 目安 ${lim} km・${st.count}回${s.start ? `・${s.start.slice(0,4)}/${+s.start.slice(5,7)}/${+s.start.slice(8,10)}〜` : ''}</div>
-    <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${s.retired ? '#bbb' : color}"></div></div>
+    <div style="font-size:0.8em;color:#666;margin:4px 0">${st.km.toFixed(1)} km / ${+s.raceKm ? `本番用 ${+s.raceKm} km・` : ''}買い替え ${lim} km・${st.count}回${s.start ? `・${s.start.slice(0,4)}/${+s.start.slice(5,7)}/${+s.start.slice(8,10)}〜` : ''}</div>
+    <div class="progress-bar" style="position:relative"><div class="progress-fill" style="width:${pct}%;background:${s.retired ? '#bbb' : color}"></div>${+s.raceKm && +s.raceKm < lim ? `<div title="本番用の目安" style="position:absolute;top:-2px;bottom:-2px;left:${Math.round(+s.raceKm / lim * 100)}%;width:2px;background:#1565C0"></div>` : ''}</div>
     ${shoeBreakdownHTML(s, st)}
     ${withButtons ? `<div style="display:flex;gap:8px;margin-top:8px">
       <button onclick="openShoeForm('${s.id}')" style="flex:1;padding:7px;background:#fff;border:1px solid #ddd;border-radius:8px;font-size:0.8em">✏️ 編集</button>
@@ -1146,6 +1165,8 @@ function openShoeForm(id) {
   document.getElementById('shoeStart').value   = s ? (s.start || '') : new Date().toLocaleDateString('sv');
   document.getElementById('shoeInitKm').value  = s && s.initKm ? s.initKm : '';
   document.getElementById('shoeLimitKm').value = s ? (s.limitKm || SHOE_LIMIT_DEFAULT) : SHOE_LIMIT_DEFAULT;
+  document.getElementById('shoeRaceKm').value  = s && s.raceKm ? s.raceKm : '';
+  document.getElementById('shoeDeleteBtn').style.display = s ? 'block' : 'none'; // 消すのは登録済みの靴だけ
   document.getElementById('shoeForm').style.display = 'block';
   document.getElementById('shoeAddBtn').style.display = 'none';
 }
@@ -1162,20 +1183,22 @@ function saveShoe() {
   const start   = document.getElementById('shoeStart').value || '';
   const initKm  = Math.max(0, parseFloat(document.getElementById('shoeInitKm').value) || 0);
   const limitKm = parseInt(document.getElementById('shoeLimitKm').value) || SHOE_LIMIT_DEFAULT;
-  const shoes = getShoes();
+  const raceKm  = parseInt(document.getElementById('shoeRaceKm').value) || 0;
+  if (raceKm && raceKm >= limitKm) { alert('本番用の目安は、買い替えの目安より小さい数にしてください'); return; }
+  const shoes = getShoesRaw();
   if (editingShoeId) {
     const s = shoes.find(x => x.id === editingShoeId);
-    if (s) Object.assign(s, { brand, name, color, start, initKm, limitKm, updatedAt: Date.now() });
+    if (s) Object.assign(s, { brand, name, color, start, initKm, limitKm, raceKm, updatedAt: Date.now() });
   } else {
     const id = 'shoe_' + Date.now();
-    shoes.push({ id, brand, name, color, start, initKm, limitKm, retired:false, updatedAt: Date.now() });
+    shoes.push({ id, brand, name, color, start, initKm, limitKm, raceKm, retired:false, updatedAt: Date.now() });
   }
   setShoes(shoes);
   closeShoeForm();
   renderShoes();
 }
 function toggleShoeRetired(id) {
-  const shoes = getShoes();
+  const shoes = getShoesRaw();
   const s = shoes.find(x => x.id === id);
   if (!s) return;
   if (!s.retired && !confirm(`「${shoeNameText(s)}」を引退にしますか？\n（記録と距離は残ります。あとで戻すこともできます）`)) return;
@@ -1184,11 +1207,33 @@ function toggleShoeRetired(id) {
   setShoes(shoes);
   renderShoes();
 }
+// 靴を消す：靴の一覧から外す。その靴で走った記録は消さず「靴なし」になる（記録は書きかえない）
+// 同期でほかの端末から生き返らないよう、消した印（deleted）と時刻を残す
+function deleteShoe() {
+  const id = editingShoeId;
+  const shoes = getShoesRaw();
+  const s = shoes.find(x => x.id === id);
+  if (!s) return;
+  const st = shoeStats()[id] || { km:0, count:0 };
+  const ok = confirm(`「${shoeNameText(s)}」を消しますか？\n\nこの靴で走った ${st.count}回・${st.km.toFixed(1)}km の記録は消えず、靴が「なし」になります。元に戻せません。\n\n［OK］消す\n［キャンセル］消さない（このあと「引退」にするかを選べます）`);
+  if (!ok) {
+    if (!s.retired && confirm(`消す代わりに「引退」にしますか？\n（靴と距離の記録が残り、一覧の下に移ります。あとで戻すこともできます）`)) {
+      s.retired = true; s.updatedAt = Date.now();
+      setShoes(shoes); closeShoeForm(); renderShoes();
+    }
+    return;
+  }
+  s.deleted = true; s.updatedAt = Date.now();
+  setShoes(shoes);
+  closeShoeForm();
+  refreshAll(); // 記録の一覧などの靴の表示も消す
+}
 // 記録の入力画面の靴の選択肢（引退した靴は、編集中の記録で使っているときだけ出す）
 function fillShoeSelect(selectedId) {
   const shoes = sortedShoes().filter(s => !s.retired || s.id === selectedId);
+  const st = shoeStats();
   document.getElementById('fShoe').innerHTML =
-    shoes.map(s => `<option value="${s.id}">${escHTML(shoeNameText(s))}${s.retired ? '（引退）' : ''}</option>`).join('')
+    shoes.map(s => `<option value="${s.id}">${escHTML(shoeNameText(s))}${s.retired ? '（引退）' : `・${shoeStage(s, st[s.id].km).short}`}</option>`).join('')
     + '<option value="none">選ばない</option>';
   document.getElementById('fShoe').value = selectedId && shoes.some(s => s.id === selectedId) ? selectedId : 'none';
 }
@@ -1939,16 +1984,25 @@ function saveRun() {
   }
   closeModal();
   refreshAll();
-  // 靴：目安の8割・目安を超えたときに一度だけ知らせる
+  // 靴：段階が進んだとき（本番用→練習用、そろそろ、買い替え）に一度だけ知らせる
   if (shoeObj && !shoeObj.retired) {
-    const before = shoeLevel(shoeObj, shoeKmBefore);
+    const before = shoeStage(shoeObj, shoeKmBefore);
     const kmNow = shoeStats()[shoe].km;
-    const after = shoeLevel(shoeObj, kmNow);
-    if (after > before) {
-      alert(after === 2
-        ? `👟「${shoeNameText(shoeObj)}」が買い替えの目安（${shoeObj.limitKm || SHOE_LIMIT_DEFAULT}km）を超えました（${kmNow.toFixed(1)}km）。\n足や膝に違和感があれば、早めの買い替えを考えましょう。`
-        : `👟「${shoeNameText(shoeObj)}」がそろそろ買い替えの目安です（${kmNow.toFixed(1)}km / 目安 ${shoeObj.limitKm || SHOE_LIMIT_DEFAULT}km）。`);
+    const after = shoeStage(shoeObj, kmNow);
+    const msgs = [];
+    // レースの記録で、本番用の目安を超えた靴を選んだとき（保存はそのまま）
+    if (type === 'race' && +shoeObj.raceKm && shoeKmBefore >= +shoeObj.raceKm) {
+      msgs.push(`👟「${shoeNameText(shoeObj)}」は本番用の目安（${+shoeObj.raceKm}km）を超えて「${before.label}」の段階です（${shoeKmBefore.toFixed(1)}km）。記録はそのまま保存しました。`);
     }
+    if (after.rank > before.rank) {
+      const lim = shoeObj.limitKm || SHOE_LIMIT_DEFAULT;
+      msgs.push(after.key === 'over'
+        ? `👟「${shoeNameText(shoeObj)}」が買い替えの目安（${lim}km）を超えました（${kmNow.toFixed(1)}km）。\n足や膝に違和感があれば、早めの買い替えを考えましょう。`
+        : after.key === 'soon'
+          ? `👟「${shoeNameText(shoeObj)}」がそろそろ買い替えの目安です（${kmNow.toFixed(1)}km / 目安 ${lim}km）。`
+          : `👟「${shoeNameText(shoeObj)}」が本番用の目安（${+shoeObj.raceKm}km）を超えました（${kmNow.toFixed(1)}km）。これからは練習用として使いましょう。`);
+    }
+    if (msgs.length) alert(msgs.join('\n\n'));
   }
 }
 
@@ -3141,8 +3195,8 @@ function refreshAll() {
 // ── アプリの版と、新しい版のお知らせ ─────────────────────────
 // 直して公開するたびに APP_VERSION を上げる（⚙ のいちばん下に表示）。
 // GitHub Pages は最大10分ほど古い版を返すことがあるため、起動時に最新のページを取りに行き、版が新しければ上にお知らせを出す
-const APP_VERSION = '2026-11-22.6';
-const APP_VERSION_NOTE = '靴のメーカー・色に対応／同期で靴の情報が消えないように';
+const APP_VERSION = '2026-11-22.7';
+const APP_VERSION_NOTE = '靴の消去・本番用の目安';
 function showAppVersion() {
   const el = document.getElementById('appVersionLabel');
   if (el) el.textContent = `${APP_VERSION}（${APP_VERSION_NOTE}）`;
